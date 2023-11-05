@@ -30,11 +30,11 @@ class MainWindow(QWidget):
             with open('ratings.json', 'r') as json_file:
                 self.ratings = json.load(json_file)
         else:
-            self.ratings = {video: 0 for video in self.videos}
+            self.ratings = {video: None for video in self.videos}
 
         for video in self.videos:
             if video not in self.ratings:
-                self.ratings[video] = 0
+                self.ratings[video] = None
 
         self.layout = QVBoxLayout(self)
 
