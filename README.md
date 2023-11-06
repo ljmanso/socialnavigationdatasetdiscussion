@@ -25,6 +25,6 @@ That will show a window manager with a terminal. To generate random walk traject
  - `python3 code/random_walk_agent.py`
 
 That will generate 3 trajectories and leave the JSON files and the corresponding videos in a directory named `episode_recordings`. To rate them, once the previous script has finished, run:
- - `pythyon3 code/rate.py`
+ - `python3 code/rate.py`
 
 Once all the trajectories are rated, the output will be written in `ratings.json`.
