@@ -13,7 +13,10 @@ That will give you a shell, but we want to connect using a VNC client. In this c
  - `xtightvncviewer localhost:5920`
  - Type the password when asked.
 
-That will show a window manager with a terminal. To replay a simulated trajectory:
- - `python3 sn3_replay.py FILE`
+That will show a window manager in the container. To replay a simulated trajectory you can run the following either using an `xterm` within the virtual desktop or within the docker prompt:
+ - `python3 code/sn3_replay.py FILE`
 
-where `FILE` is any of the files in the `sn3_examples` directory.
+where `FILE` is any of the files in the `sn3_examples` directory. For instance:
+ - `python3 code/sn3_replay.py sn3_examples/1716901588_data.pickle`
+
+(Th)

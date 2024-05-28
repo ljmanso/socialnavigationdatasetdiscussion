@@ -92,7 +92,6 @@ class FileSubscriber():
 
         # Draw skeletons
         if self.skeletons is not None:
-            print(len(self.skeletons))
             for skeleton in self.skeletons:
                 if len(skeleton)<18:
                     continue
@@ -242,5 +241,5 @@ if __name__ == "__main__":
     wfd.close()
 
 
-    print("Probably, we should store msg2dict instead of the raw messages, to ignore ROS2")
+    print("Probably, we should store msg2dict instead of the raw messages")
 
