@@ -5,12 +5,11 @@ To reproduce a recorded trajectory:
  - `git clone https://github.com/ljmanso/socialnavigationdatasetdiscussion`
  - `cd socialnavigationdatasetdiscussion`
  - `wget https://ljmanso.com/files/sn3_examples.tgz`
- - `tar xzf sn_examples.tgz`
+ - `tar xzf sn3_examples.tgz`
  - `sudo docker build -t sn3 .`
- - `cd code`
  - `sudo docker run -it --net=host --rm --gpus all -v $(pwd):/project -w /project sn3 bash`
 
-That will give you a shell, but we want to connect using a VNC client. In this case we are using `xtightvncviewer`, but other clients should work just as well. The VNC server uses "sn3" as a password -feel free to change it:
+That will give you a shell, but we want to connect using a VNC client. In this case we are using `xtightvncviewer`, but other clients should work just as well. The VNC server uses "sn3" as a password -feel free to change it (run the following outside the docker):
  - `xtightvncviewer localhost:5920`
  - Type the password when asked.
 
