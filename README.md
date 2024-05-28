@@ -18,5 +18,3 @@ That will show a window manager in the container. To replay a simulated trajecto
 
 where `FILE` is any of the files in the `sn3_examples` directory. For instance:
  - `python3 code/sn3_replay.py sn3_examples/1716901588_data.pickle`
-
-(Th)
