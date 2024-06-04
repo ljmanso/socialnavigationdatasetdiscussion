@@ -17,12 +17,14 @@ from nav_msgs.msg import OccupancyGrid
 from sensor_msgs.msg import LaserScan
 
 
+
 from sn3min import *
 
 print_times = {}
 t0file = None
 t0real = time.time()
 
+data_structure = {}
 
 def delay_until(msg):
     global t0file
@@ -48,6 +50,15 @@ def print_msg(msg):
     print("}")
 
 
+def json_struct_from_map(main, map):
+    ret = {
+        "width": MAP_ROWS_HLEN,
+        "height": MAP_ROWS_HLEN,
+        "cell_size": map["data"]["resolution"],
+        "data": []
+    }
+    return ret
+
 
 class FileSubscriber():
     def __init__(self):
@@ -69,6 +80,8 @@ class FileSubscriber():
         self.skeletons = None
 
         self.video = {}
+
+
 
     def draw_things(self):
 
@@ -102,14 +115,43 @@ class FileSubscriber():
                     y = skeleton[y_idx]
                     x2d = int(-(x)/self.map_mult)+MAP_COLS_HLEN+420
                     y2d = MAP_COLS_HLEN-int(-(y)/self.map_mult)+120
-                    if joint in [2,4,6,8,10,12,14,16]:
-                        color = (255,0,)
-                    elif joint in [1,3,5,7,9,11,13,15]:
-                        color = (0,0,255)
+                    if joint in (2,4,6,8,10,12,14,16):
+                        color = (255,150,150)
+                    elif joint in (1,3,5,7,9,11,13,15):
+                        color = (150,150,255)
                     else:
-                        color = (0,125,125)
+                        color = (120,225,225)
                     cv2.circle(self.canvas, (x2d, y2d), 3, color, 2)
-
+                # Draw as a oriented circle
+                shoulders = (5, 6) # left, right
+                hips = (11, 12) # left, right
+                angle_srcs = (shoulders, hips)
+                angle_final = None
+                x = 0
+                y = 0
+                for angle_src in angle_srcs:
+                    a = angle_src[0]
+                    b = angle_src[1]
+                    ax = skeleton[a*3+0]
+                    ay = skeleton[a*3+1]
+                    bx = skeleton[b*3+0]
+                    by = skeleton[b*3+1]
+                    x += ax + bx
+                    y += ay + by
+                    angle = np.arctan2(by-ay, bx-ax)
+                    if angle_final is None:
+                        angle_final = angle
+                    else:
+                        angle_final = angle_final/2 + angle/2
+                angle += np.pi/2.
+                hx = x / 4
+                hy = y / 4
+                cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+420
+                cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+120
+                x2 = cx + int(25*np.cos(-angle+self.map_yaw+np.pi))
+                y2 = cy + int(25*np.sin(-angle+self.map_yaw+np.pi))
+                cv2.circle(self.canvas, (cx, cy), 10, (0,0,0), 2)
+                cv2.line(self.canvas, (cx, cy), (x2, y2), (0,0,255), 2)
 
 
         # Draw goal
@@ -150,6 +192,7 @@ class FileSubscriber():
         for k in self.video.keys():
             if self.video[k] is not None:
                 cv2.imshow(k, self.video[k])
+                
 
 
         cv2.imshow("sn3", self.canvas)
