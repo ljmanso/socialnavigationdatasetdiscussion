@@ -58,7 +58,7 @@ def draw_object(o, canvas, map_mult):
         pts = pts.reshape((1,-1,2)).astype(np.int32)
         print(f"p{pts.shape=}   {pts.dtype=}")
         print(f"p{pts}")
-        cv2.fillPoly(canvas, pts, (100,0,155))
+        cv2.fillPoly(canvas, pts, (63,133,205))
 
 def json_struct_from_map(main, map):
     print(map)
