@@ -1,8 +1,9 @@
 import time
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 import numpy as np
+
 
 
 MAP_ROWS_OFFSET = 940
@@ -21,7 +22,30 @@ FINAL_MAP_WIDTH = int(MAP_ROWS_LEN*ORG_MAP_SCALE)
 
 
 
-Quaternion = namedtuple('Quaternion', ['x', 'y', 'z', 'w'])
+# ros2noros data types
+Header = namedtuple("Header", ['stamp', 'frame_id'])
+MapMetaData = namedtuple("MapMetaData", ['map_load_time', 'resolution', 'width', 'height', 'origin'])
+OccupancyGrid = namedtuple("OccupancyGrid", ['header', 'info', 'data'])
+Odometry = namedtuple("Odometry", ['header', 'frame_id', 'pose', 'twist'])
+Point = namedtuple("Point", ['x', 'y', 'z'])
+Pose = namedtuple("Pose", ['position', 'orientation'])
+PoseWithCovariance = namedtuple("PoseWithCovariance", ['pose', 'covariance'])
+Quaternion = namedtuple("Quaternion", ['x', 'y', 'z', 'w'])
+Time = namedtuple("Time", ['sec', 'nanosec'])
+Twist = namedtuple("Twist", ['linear', 'angular'])
+TwistWithCovariance = namedtuple("TwistWithCovariance", ['pose', 'covariance'])
+LaserScan = namedtuple("LaserScan", ['header', 'angle_min', 'angle_max', 'angle_increment',
+                                     'time_increment', 'scan_time', 'range_min',
+                                     'range_max', 'ranges', 'intensities'])
+
+
+def print_msg(msg):
+    print("{", end="")
+    print(f"type: {msg['type']}", end=", ")
+    print(f"msg: {type(msg['data'])}", end=", ")
+    print(f"time: {msg['time']}", end="")
+    print("}")
+
 
 
 def timed_print(name, print_times, *args,  **kwargs):
@@ -47,10 +71,16 @@ def euler_from_quaternion(quaternion):
     quaternion = [x, y, z, w]
     Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
     """
-    x = quaternion.x
-    y = quaternion.y
-    z = quaternion.z
-    w = quaternion.w
+    if type(quaternion) == OrderedDict:
+        x = quaternion["x"]
+        y = quaternion["y"]
+        z = quaternion["z"]
+        w = quaternion["w"]
+    else:
+        x = quaternion.x
+        y = quaternion.y
+        z = quaternion.z
+        w = quaternion.w
 
     sinr_cosp = 2 * (w * x + y * z)
     cosr_cosp = 1 - 2 * (x * x + y * y)

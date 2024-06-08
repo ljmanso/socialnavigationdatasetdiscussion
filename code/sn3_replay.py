@@ -8,13 +8,13 @@ import numpy as np
 
 import cv2
 
-import rclpy
-from rclpy.node import Node
-from nav_msgs.msg import Odometry
-from std_msgs.msg import String
-from geometry_msgs.msg import Pose
-from nav_msgs.msg import OccupancyGrid
-from sensor_msgs.msg import LaserScan
+# import rclpy
+# from rclpy.node import Node
+# from nav_msgs.msg import Odometry
+# from std_msgs.msg import String
+# from geometry_msgs.msg import Pose
+# from nav_msgs.msg import OccupancyGrid
+# from sensor_msgs.msg import LaserScan
 
 
 from sn3min import *
@@ -148,7 +148,8 @@ class FileSubscriber():
 
         # Draw video
         for k in self.video.keys():
-            cv2.imshow(k, self.video[k])
+            if self.video[k] is not None:
+                cv2.imshow(k, self.video[k])
 
 
         cv2.imshow("sn3", self.canvas)
@@ -167,7 +168,7 @@ class FileSubscriber():
 
 
     def listener_goal(self, msg):
-        self.goal_msg = [float(x) for x in msg.data.split(",")]
+        self.goal_msg = [float(x) for x in msg.split(",")]
 
 
     def listener_map(self, msg, dont_save=False):
@@ -212,8 +213,8 @@ if __name__ == "__main__":
         try:
             msg = pickle.load(wfd)
             if type(msg) != type({}):
+                print("??", msg)
                 continue
-            # print(type(msg))
             # print("--------------------------------")
             # print_msg(msg)
             delay_until(msg)
@@ -229,17 +230,17 @@ if __name__ == "__main__":
                 stuff.skeletons = msg["data"]
             elif msg["type"].startswith("video"):
                 stuff.video[msg["type"]] = msg["data"]
-            
+
             t = time.time()
             if t-last_draw>0.05:
                 last_draw = t
                 stuff.draw_things()
 
         except EOFError:
+            print('EOF')
             break
 
     wfd.close()
 
 
-    print("Probably, we should store msg2dict instead of the raw messages")
 

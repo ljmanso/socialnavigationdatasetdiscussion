@@ -1,7 +1,7 @@
 import sys
 import time
 import itertools
-from collections import namedtuple
+from collections import namedtuple, deque
 
 import numpy as np
 
@@ -15,7 +15,11 @@ from geometry_msgs.msg import Pose
 from nav_msgs.msg import OccupancyGrid
 from sensor_msgs.msg import LaserScan
 
-vid = cv2.VideoCapture("/dev/video2") 
+vid = cv2.VideoCapture("/dev/video6")
+if vid is None:
+    print("Cannot open camera")
+    sys.exit(-1)
+print(vid)
 
 import pickle
 
@@ -26,7 +30,11 @@ global wfd
 wfd = None
 
 import rosidl_runtime_py
+
+def identity(x):
+    return x
 msg2dict = rosidl_runtime_py.convert.message_to_ordereddict 
+msg2dict = identity
 
 from sn3min import *
 
@@ -53,6 +61,8 @@ class MinimalSubscriber(Node):
         super().__init__('sn3')
         self.record = False
 
+        self.waitqueue = deque()
+
         self.subscription = self.create_subscription(Pose, "/fromICE/pose", self.listener_pose, 10)
         self.subscription_map = self.create_subscription(OccupancyGrid, "/robot/map", self.listener_map, 10)
         self.subscription_goal = self.create_subscription(String, "/robot/goal", self.listener_goal, 10)
@@ -77,11 +87,19 @@ class MinimalSubscriber(Node):
 
         self.listener_map(pickle.load(open("map.pickle", "rb")), dont_save=True)
 
+    def remove_old_in_queue(self):
+        t = time.time()
+        while len(self.waitqueue) > 0:
+            if t - self.waitqueue[0]["time"] > 5:
+                p = self.waitqueue.popleft()
+            else:
+                break
+
     def draw_things(self):
         if self.map_data is None:
             timed_print("draw", print_times, "pose (map is None)")
             return
-
+        
         # Draw map
         self.canvas[:, :, :] = self.canvas_stored[:, :, :]
 
@@ -103,7 +121,6 @@ class MinimalSubscriber(Node):
 
         # Draw skeletons
         if self.skeletons is not None:
-            print(len(self.skeletons))
             for skeleton in self.skeletons:
                 if len(skeleton)<18:
                     continue
@@ -124,6 +141,9 @@ class MinimalSubscriber(Node):
 
         # Draw goal
         if self.goal_msg is not None:
+
+            self.waitqueue
+
             position = self.goal_msg[0:3]
             quat = self.goal_msg[3:7]
             status = self.goal_msg[-1]
@@ -163,6 +183,8 @@ class MinimalSubscriber(Node):
         if cv2.waitKey(1) == 27:
             sys.exit(0)
 
+        if not self.record:
+            self.remove_old_in_queue()
 
     def listener_pose(self, msg):
         if self.map_data is None:
@@ -173,16 +195,22 @@ class MinimalSubscriber(Node):
 
         if self.record is True:
             global wfd
-            pickle.dump({"type": "pose", "time": time.time(), "data": msg}, wfd)
+            pickle.dump({"type": "pose", "time": time.time(), "data": msg2dict(msg)}, wfd)
+        else:
+            self.waitqueue.append({"type": "pose", "time": time.time(), "data": msg2dict(msg)})
 
 
     def listener_laser(self, msg):
         self.laser_msg = msg
 
+        msgw = {"type": "laser", "time": time.time(), "data": msg}
+        # print(msgw)
         if self.record is True:
             global wfd
-            pickle.dump({"type": "laser", "time": time.time(), "data": msg}, wfd)
-
+            d = pickle.dump(msgw, wfd)
+            print(d)
+        else:
+            self.waitqueue.append(msgw)
 
     def listener_goal(self, msg):
         self.goal_msg = [float(x) for x in msg.data.split(",")]
@@ -197,28 +225,42 @@ class MinimalSubscriber(Node):
                 if wfd is not None:
                     print("CLOSE2")
                     wfd.close()
-                fname = f"{str(int((time.time())))}_data.pickle"
-                wfd = open(fname, "wb")
-                pickle.dump({"type": "map", "time": time.time(), "data": self.map_msg}, wfd)
-
-                print("OPEN", fname)
+                self.fname = f"{str(int((time.time())))}_dat.pickle"
+                wfd = open(self.fname, "wb")
+                self.force_first_message_map = {"type": "map", "time": time.time(), "data": msg2dict(self.map_msg)}
+                print("OPEN", self.fname, wfd)
             # set record to true, so that messages are recorded
             self.record = True
-        ## IF THERE IS NO GOAL
+        ## if there's no goal but.. THERE WAS A GOAL!
         elif self.record == True:
-            ## BUT THERE WAS! A GOAL BEFORE
-            # global wfd
             self.record = False
             if wfd is not None:
                 # then we need to close the file
                 wfd.close()
                 print("CLOSE")
-                wfd = None
+            pre_fname = self.fname
+            pre_fname = pre_fname.replace("_dat", "_pre")
+            print("Writing queue", )
+            prefd = open(pre_fname, "wb")
+            print(prefd)
+            while True:
+                try:
+                    msg = self.waitqueue.popleft()
+                    if self.force_first_message_map is not None:
+                        self.force_first_message_map["time"] = msg["time"]
+                        pickle.dump(self.force_first_message_map, prefd)
+                        self.force_first_message_map = None
+                    pickle.dump(msg, prefd)
+                except IndexError:
+                    break
+            prefd.close()
 
         if self.record is True:
             # global wfd
+            print("dumping goal")
             pickle.dump({"type": "goal", "time": time.time(), "data": msg}, wfd)
-
+        else:
+            self.waitqueue.append({"type": "goal", "time": time.time(), "data": msg})
 
     def listener_map(self, msg, dont_save=False):
         print("MAP!")
@@ -291,9 +333,9 @@ def main(args=None):
             minimal_subscriber.skeletons = skeletons
             if minimal_subscriber.record is True:
                 global wfd
-
                 pickle.dump({"type": "humans", "time": time.time(), "data": minimal_subscriber.skeletons}, wfd)
-
+            else:
+                minimal_subscriber.waitqueue.append({"type": "humans", "time": time.time(), "data": minimal_subscriber.skeletons})
             # try:
             #     for idx, skeleton in enumerate(minimal_subscriber.skeletons):
             #         print(f"{idx=}, {len(skeleton)=}, {skeleton=}")
@@ -311,13 +353,14 @@ def main(args=None):
             image_ok, frame = vid.read() 
             if image_ok is True:
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
-                # cv2.imshow('frame', frame) 
-                # if cv2.waitKey(1) == 27:
-                #     break
+                cv2.imshow('frame', frame) 
+                if cv2.waitKey(1) == 27:
+                    break
             if minimal_subscriber.record is True:
                 # global wfd
                 pickle.dump({"type": "video0", "time": time.time(), "data": frame}, wfd)
-
+            else:
+                minimal_subscriber.waitqueue.append({"type": "video0", "time": time.time(), "data": frame})
 
 
 
