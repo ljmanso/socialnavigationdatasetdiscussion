@@ -99,7 +99,7 @@ class MinimalSubscriber(Node):
         if self.map_data is None:
             timed_print("draw", print_times, "pose (map is None)")
             return
-        
+
         # Draw map
         self.canvas[:, :, :] = self.canvas_stored[:, :, :]
 
@@ -257,7 +257,6 @@ class MinimalSubscriber(Node):
 
         if self.record is True:
             # global wfd
-            print("dumping goal")
             pickle.dump({"type": "goal", "time": time.time(), "data": msg}, wfd)
         else:
             self.waitqueue.append({"type": "goal", "time": time.time(), "data": msg})
