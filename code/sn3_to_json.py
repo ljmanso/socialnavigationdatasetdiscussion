@@ -68,35 +68,37 @@ class FileSubscriber():
         self.goal_msg = None
         self.skeletons = None
 
+        self.rx = self.ry = self.ra = 0.
+        self.rsx = self.rsy = self.rsa = 0
+        self.rgx = self.rgy = self.rga = 0
+        self.timestamp = 0
+        self.objects = []
+        self.walls = []
+        self.interactions = []
+
+
         self.video = {}
 
 
     def add_to_json_structure(self):
-        rx = ry = ra = 0.
-        rsx = rsy = rsa = 0
-        rgx = rgy = rga = 0
-        timestamp = 0
-        people = []
-        objects = []
-        walls = []
-        interactions = []
 
         ret = {
-            "timestamp": timestamp,
+            "timestamp": self.timestamp,
             "robot": {
-                    "x": rx,
-                    "y": ry,
-                    "a": ra,
-                    "speedx": rsx,
-                    "speedy": rsy,
-                    "speeda": rsa,
-                    "goalx": rgx,
-                    "goaly": rgy,
+                    "x": self.robot_x,
+                    "y": self.robot_y,
+                    "a": self.robot_yaw,
+                    "speedx": self.rsx, # TO DO
+                    "speedy": self.rsy, # TO DO
+                    "speeda": self.rsa, # TO DO
+                    "goalx": self.rgx,
+                    "goaly": self.rgy,
+                    "goala": self.rga
                 },
-            "people": people,
-            "objects": objects,
-            "walls": walls,
-            "interactions": interactions
+            "people": self.skeletons,
+            "objects": self.objects, # TO DO
+            "walls": self.walls, # TO DO
+            "interactions": self.interactions # TO DO
         }
         data_structure["sequence"].append(ret)
 
@@ -176,17 +178,17 @@ class FileSubscriber():
             position = self.goal_msg[0:3]
             quat = self.goal_msg[3:7]
             status = self.goal_msg[-1]
-            gx = position[0]
-            gy = position[1]
+            self.rgx = position[0]
+            self.rgy = position[1]
             if status < 3:
                 color = tuple((0,1,0))
             else:
                 color = tuple((0,0.35,0.65))
-            goal_yaw = euler_from_tuple(quat)[2]
-            gx = int(-(gx)/self.map_mult)+MAP_COLS_HLEN+420
-            gy = MAP_COLS_HLEN-int(-(gy)/self.map_mult)+120
-            x2 = gx + int(25*np.cos(-goal_yaw+self.map_yaw+np.pi))
-            y2 = gy + int(25*np.sin(-goal_yaw+self.map_yaw+np.pi))
+            self.rga = euler_from_tuple(quat)[2]
+            gx = int(-(self.rgx)/self.map_mult)+MAP_COLS_HLEN+420
+            gy = MAP_COLS_HLEN-int(-(self.rgy)/self.map_mult)+120
+            x2 = gx + int(25*np.cos(-self.rga+self.map_yaw+np.pi))
+            y2 = gy + int(25*np.sin(-self.rga+self.map_yaw+np.pi))
             cv2.circle(self.canvas, (gx, gy), ROBOT_WIDTH, color, 2)
             cv2.line(self.canvas, (gx, gy), (x2, y2), (0,0,0), 2)
 
