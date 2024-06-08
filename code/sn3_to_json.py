@@ -35,6 +35,30 @@ data_structure = {
 
 concatenated = None
 
+objects = json.load(open("objects.json","r"))
+
+
+def rotate(x, y, radians):
+    xx = x * np.cos(radians) + y * np.sin(radians)
+    yy = -x * np.sin(radians) + y * np.cos(radians)
+    return [xx, yy]
+
+def draw_object(o, canvas, map_mult):
+    if o["type"] == "table":
+        pts = np.array([rotate(-o["width"]/2, -o["depth"]/2, o["angle"]),
+                        rotate(-o["width"]/2, +o["depth"]/2, o["angle"]),
+                        rotate(+o["width"]/2, +o["depth"]/2, o["angle"]),
+                        rotate(+o["width"]/2, -o["depth"]/2, o["angle"]),
+                        rotate(-o["width"]/2, -o["depth"]/2, o["angle"])])
+        offset = np.array([o["x"], o["y"]])
+        pts += offset
+
+        pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
+        pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
+        pts = pts.reshape((1,-1,2)).astype(np.int32)
+        print(f"p{pts.shape=}   {pts.dtype=}")
+        print(f"p{pts}")
+        cv2.fillPoly(canvas, pts, (100,0,155))
 
 def json_struct_from_map(main, map):
     print(map)
@@ -105,6 +129,10 @@ class FileSubscriber():
     def draw_things(self):
         # Draw map
         self.canvas[:, :, :] = self.canvas_stored[:, :, :]
+
+        # Draw objects
+        for o in objects:
+            draw_object(o, self.canvas, self.map_mult)
 
         # Draw pose
         if self.pose_msg is not None:
@@ -310,7 +338,7 @@ if __name__ == "__main__":
             stuff.add_to_json_structure()
 
     json_fd = open(sys.argv[1].replace(".pickle", ".json"), "w")
-    print(data_structure)
+    # print(data_structure)
     json.dump(data_structure, json_fd, indent=4)
     wfd.close()
 
