@@ -279,7 +279,7 @@ class FileSubscriber():
 
 
 
-        if cv2.waitKey(250) == 27:
+        if cv2.waitKey(1) == 27:
             sys.exit(0)
 
 
