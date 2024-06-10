@@ -63,10 +63,11 @@ class MinimalSubscriber(Node):
 
         self.waitqueue = deque()
 
-        self.subscription = self.create_subscription(Pose, "/fromICE/pose", self.listener_pose, 10)
+        self.subscription = self.create_subscription(Pose, "/robot/base_pose", self.listener_pose, 10)
         self.subscription_map = self.create_subscription(OccupancyGrid, "/robot/map", self.listener_map, 10)
         self.subscription_goal = self.create_subscription(String, "/robot/goal", self.listener_goal, 10)
-        self.subscription_laser = self.create_subscription(LaserScan, "/fromICE/Laser/data", self.listener_laser, 10)
+        self.subscription_cmd = self.create_subscription(String, "/robot/velocity_command", self.listener_cmd, 10)
+        self.subscription_laser = self.create_subscription(LaserScan, "/robot/laser_data", self.listener_laser, 10)
 
         self.org_map_resolution = None
         self.org_map_width = None
@@ -75,6 +76,8 @@ class MinimalSubscriber(Node):
         self.robot_x = None
         self.robot_y = None
         self.robot_yaw = None
+
+        self.cmd = None
 
         self.map_data = None
         self.canvas = np.zeros((FINAL_MAP_WIDTH, FINAL_MAP_WIDTH, 3))
@@ -191,20 +194,40 @@ class MinimalSubscriber(Node):
             timed_print("pose", print_times, "(map is None)")
             return
         # print(msg2dict(msg))
-        self.pose_msg = msg
+        self.pose_msg = msg2dict(msg)
+        if self.pose_msg is None:
+            print("POSE IS NONE")
+            sys.exit(-1)
 
         if self.record is True:
             global wfd
-            pickle.dump({"type": "pose", "time": time.time(), "data": msg2dict(msg)}, wfd)
+            pickle.dump({"type": "pose", "time": time.time(), "data": self.pose_msg}, wfd)
         else:
-            self.waitqueue.append({"type": "pose", "time": time.time(), "data": msg2dict(msg)})
+            self.waitqueue.append({"type": "pose", "time": time.time(), "data": self.pose_msg})
+
+    def listener_cmd(self, msg):
+        self.cmd = [float(x) for x in msg.data.split(",")]
+
+
+        if self.map_data is None:
+            timed_print("cmd", print_times, "(map is None)")
+            return
+        
+        if self.cmd is None:
+            print("CMD IS NONE")
+            sys.exit(1)
+
+        if self.record is True:
+            global wfd
+            pickle.dump({"type": "command", "time": time.time(), "data": self.cmd}, wfd)
+        else:
+            self.waitqueue.append({"type": "command", "time": time.time(), "data": self.cmd})
 
 
     def listener_laser(self, msg):
         self.laser_msg = msg
 
         msgw = {"type": "laser", "time": time.time(), "data": msg}
-        # print(msgw)
         if self.record is True:
             global wfd
             d = pickle.dump(msgw, wfd)

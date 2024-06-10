@@ -1,34 +1,90 @@
 [
     {
+        "type": "shelf",
+        "width": 1.75,
+        "depth": 0.48,
+        "x": 3.95,
+        "y": 4.2,
+        "angle": 1.05
+    },
+    {
         "type": "table",
-        "width": 1.8,
-        "depth": 0.8,
+        "width": 1.75,
+        "depth": 0.7,
         "x": -1.15,
-        "y": 0,
+        "y": -0.09,
         "angle": 1.05
     },
     {
         "type": "table",
-        "width": 1.8,
-        "depth": 0.8,
-        "x": -2.07,
-        "y": 1.6,
+        "width": 1.75,
+        "depth": 0.7,
+        "x": -2.03,
+        "y": 1.44,
         "angle": 1.05
     },
     {
         "type": "table",
-        "width": 1.8,
-        "depth": 0.8,
+        "width": 1.75,
+        "depth": 0.7,
+        "x": -2.92,
+        "y": 2.96,
+        "angle": 1.05
+    },
+    {
+        "type": "table",
+        "width": 1.2,
+        "depth": 0.65,
         "x": -3.0,
-        "y": 3.2,
-        "angle": 1.05
+        "y": 4.45,
+        "angle": 2.62
     },
     {
         "type": "table",
-        "width": 1.8,
-        "depth": 0.8,
-        "x": -1.15,
-        "y": 0,
+        "width": 1.2,
+        "depth": 0.65,
+        "x": -1.93,
+        "y": 5.05,
+        "angle": 2.62
+    },
+    {
+        "type": "table",
+        "width": 1.2,
+        "depth": 0.65,
+        "x": -0.858,
+        "y": 5.67,
+        "angle": 2.62
+    },
+    {
+        "type": "table",
+        "width": 1.2,
+        "depth": 0.65,
+        "x": 0.2,
+        "y": 6.3,
+        "angle": 2.62
+    },
+    {
+        "type": "table",
+        "width": 1.2,
+        "depth": 0.65,
+        "x": 1.73,
+        "y": 7.2,
+        "angle": 2.62
+    },
+    {
+        "type": "shelf",
+        "width": 2,
+        "depth": 0.5,
+        "x": 0.5,
+        "y": -2.0,
+        "angle": 2.62
+    },
+    {
+        "type": "table",
+        "width": 5,
+        "depth": 0.75,
+        "x": 3.61,
+        "y": -0.05,
         "angle": 2.62
     }
 ]
