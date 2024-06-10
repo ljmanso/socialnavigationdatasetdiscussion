@@ -36,6 +36,7 @@ data_structure = {
 concatenated = None
 
 objects = json.load(open("objects.json","r"))
+walls = json.load(open("walls.json","r"))
 
 
 def rotate(x, y, radians):
@@ -57,13 +58,21 @@ def draw_rectangle(o, canvas, map_mult, color):
                     rotate(-o["width"]/2, -o["depth"]/2, o["angle"])])
     offset = np.array([o["x"], o["y"]])
     pts += offset
-
     pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
     pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
     pts = pts.reshape((1,-1,2)).astype(np.int32)
-    print(f"p{pts.shape=}   {pts.dtype=}")
-    print(f"p{pts}")
     cv2.fillPoly(canvas, pts, color)
+
+def draw_wall(w, canvas, map_mult, color=None):
+    if color is None:
+        c = (0,0,190)
+    else:
+        c = color
+    pt1x = int((-(w[0][0])/map_mult)+MAP_COLS_HLEN+420)
+    pt1y = int(MAP_COLS_HLEN-(-(w[0][1])/map_mult)+120)
+    pt2x = int((-(w[1][0])/map_mult)+MAP_COLS_HLEN+420)
+    pt2y = int(MAP_COLS_HLEN-(-(w[1][1])/map_mult)+120)
+    cv2.line(canvas, (pt1x, pt1y), (pt2x, pt2y), c, thickness=4)
 
 def json_struct_from_map(main, map):
     print(map)
@@ -75,6 +84,31 @@ def json_struct_from_map(main, map):
     }
     return ret
 
+def get_human_pose(skeleton):
+    shoulders = (5, 6) # left, right
+    hips = (11, 12) # left, right
+    angle_srcs = (shoulders, hips)
+    angle_final = None
+    x = 0
+    y = 0
+    for angle_src in angle_srcs:
+        a = angle_src[0]
+        b = angle_src[1]
+        ax = skeleton[a*3+0]
+        ay = skeleton[a*3+1]
+        bx = skeleton[b*3+0]
+        by = skeleton[b*3+1]
+        x += ax + bx
+        y += ay + by
+        angle = np.arctan2(by-ay, bx-ax)
+        if angle_final is None:
+            angle_final = angle
+        else:
+            angle_final = angle_final/2 + angle/2
+    angle += np.pi/2.
+    hx = x / 4
+    hy = y / 4
+    return hx, hy, angle
 
 class FileSubscriber():
     def __init__(self):
@@ -98,11 +132,13 @@ class FileSubscriber():
         self.skeletons = None
 
         self.rx = self.ry = self.ra = 0.
-        self.rsx = self.rsy = self.rsa = 0
+        self.linear_vel = [0.,0.]
+        self.angular_vel = 0.
         self.rgx = self.rgy = self.rga = 0
         self.timestamp = 0
-        self.objects = []
-        self.walls = []
+        self.objects = objects
+        self.walls = walls
+        self.humans = []
         self.interactions = []
 
 
@@ -117,16 +153,15 @@ class FileSubscriber():
                     "x": self.robot_x,
                     "y": self.robot_y,
                     "a": self.robot_yaw,
-                    "speedx": self.rsx, # TO DO
-                    "speedy": self.rsy, # TO DO
-                    "speeda": self.rsa, # TO DO
+                    "linear_vel": self.linear_vel,
+                    "angular_vel": self.angular_vel,
                     "goalx": self.rgx,
                     "goaly": self.rgy,
                     "goala": self.rga
                 },
-            "people": self.skeletons,
-            "objects": self.objects, # TO DO
-            "walls": self.walls, # TO DO
+            "people": self.humans,
+            "objects": self.objects,
+            "walls": self.walls,
             "interactions": self.interactions # TO DO
         }
         data_structure["sequence"].append(ret)
@@ -138,6 +173,10 @@ class FileSubscriber():
         # Draw objects
         for o in objects:
             draw_object(o, self.canvas, self.map_mult)
+
+        # Draw walls
+        for w in walls:
+            draw_wall(w, self.canvas, self.map_mult)
 
         # Draw pose
         if self.pose_msg is not None:
@@ -156,7 +195,8 @@ class FileSubscriber():
 
         # Draw skeletons
         if self.skeletons is not None:
-            for skeleton in self.skeletons:
+            for skeleton_idx in range(len(self.skeletons)):
+                skeleton = self.skeletons[skeleton_idx]
                 if len(skeleton)<18:
                     continue
                 for joint in range(18):
@@ -175,33 +215,11 @@ class FileSubscriber():
                     if DRAW_JOINTS:
                         cv2.circle(self.canvas, (x2d, y2d), 4, color, 2)
                 # Draw as a oriented circle
-                shoulders = (5, 6) # left, right
-                hips = (11, 12) # left, right
-                angle_srcs = (shoulders, hips)
-                angle_final = None
-                x = 0
-                y = 0
-                for angle_src in angle_srcs:
-                    a = angle_src[0]
-                    b = angle_src[1]
-                    ax = skeleton[a*3+0]
-                    ay = skeleton[a*3+1]
-                    bx = skeleton[b*3+0]
-                    by = skeleton[b*3+1]
-                    x += ax + bx
-                    y += ay + by
-                    angle = np.arctan2(by-ay, bx-ax)
-                    if angle_final is None:
-                        angle_final = angle
-                    else:
-                        angle_final = angle_final/2 + angle/2
-                angle += np.pi/2.
-                hx = x / 4
-                hy = y / 4
+                hx, hy, hangle = self.humans[skeleton_idx]
                 cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+420
                 cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+120
-                x2 = cx + int(25*np.cos(-angle+self.map_yaw+np.pi))
-                y2 = cy + int(25*np.sin(-angle+self.map_yaw+np.pi))
+                x2 = cx + int(25*np.cos(-hangle+self.map_yaw+np.pi))
+                y2 = cy + int(25*np.sin(-hangle+self.map_yaw+np.pi))
                 cv2.circle(self.canvas, (cx, cy), HUMAN_WIDTH, (0,0,0), 2)
                 cv2.line(self.canvas, (cx, cy), (x2, y2), (0,0,255), 2)
 
@@ -259,7 +277,7 @@ class FileSubscriber():
 
 
 
-        if cv2.waitKey(1) == 27:
+        if cv2.waitKey(250) == 27:
             sys.exit(0)
 
 
@@ -267,8 +285,9 @@ class FileSubscriber():
         self.pose_msg = msg
 
     def listener_command(self, msg):
-        # print("command", msg)
-        self.command_msg = msg
+        self.linear_vel = [x for x in msg[:2]]
+        self.angular_vel = msg[-1]
+        
 
 
     def listener_laser(self, msg):
@@ -304,7 +323,9 @@ class FileSubscriber():
         self.map_msg = msg
         data_structure["grid"] = json_struct_from_map(self, msg)
 
-
+    def listener_skeletons(self, data):
+        self.skeletons = data
+        self.humans = [ get_human_pose(x) for x in self.skeletons ]
 
 if __name__ == "__main__":
     last_draw = None
@@ -328,7 +349,7 @@ if __name__ == "__main__":
             elif msg["type"] == "laser":
                 stuff.listener_laser(msg["data"])
             elif msg["type"] == "humans":
-                stuff.skeletons = np.array(msg["data"])
+                stuff.listener_skeletons(msg["data"])
             elif msg["type"].startswith("video"):
                 stuff.video[msg["type"]] = msg["data"]
             elif msg["type"] == "command":
