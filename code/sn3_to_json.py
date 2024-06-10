@@ -49,6 +49,8 @@ def draw_object(o, canvas, map_mult):
         draw_rectangle(o, canvas, map_mult, (63,133,205))
     if o["type"] == "shelf":
         draw_rectangle(o, canvas, map_mult, (205,133,63))
+    if o["type"] == "TV":
+        draw_rectangle(o, canvas, map_mult, (100,100,100))
 
 def draw_rectangle(o, canvas, map_mult, color):
     pts = np.array([rotate(-o["width"]/2, -o["depth"]/2, o["angle"]),
