@@ -222,7 +222,9 @@ class FileSubscriber():
                     if DRAW_JOINTS:
                         cv2.circle(self.canvas, (x2d, y2d), 4, color, 2)
                 # Draw as a oriented circle
-                hx, hy, hangle = self.humans[skeleton_idx]
+                hx = self.humans[skeleton_idx]["x"]
+                hy = self.humans[skeleton_idx]["y"]
+                hangle = self.humans[skeleton_idx]["angle"]
                 cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+420
                 cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+120
                 x2 = cx + int(25*np.cos(-hangle+self.map_yaw+np.pi))
@@ -337,7 +339,11 @@ class FileSubscriber():
 
     def listener_skeletons(self, data):
         self.skeletons = data
-        self.humans = [ get_human_pose(x) for x in self.skeletons ]
+        self.humans = []
+        for id, s in enumerate(self.skeletons):
+            pose = get_human_pose(s)
+            self.humans.append({"id":id, "x":pose[0], "y":pose[1], "angle":pose[2], "speed":0})
+        # self.humans = [ get_human_pose(x) for x in self.skeletons ]
 
 if __name__ == "__main__":
     last_draw = None
