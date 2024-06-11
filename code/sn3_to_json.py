@@ -1,6 +1,7 @@
 import sys
 import json
 import pickle
+import copy
 
 import numpy as np
 
@@ -78,11 +79,15 @@ def draw_wall(w, canvas, map_mult, color=None):
 
 def json_struct_from_map(main, map):
     print(map)
+    WMAP = 300
+    HMAP = 300
+    OMAPY = (map.info.height-HMAP)//2
+    OMAPX = (map.info.width-WMAP)//2
     ret = {
-        "width": MAP_ROWS_HLEN,
-        "height": MAP_ROWS_HLEN,
-        "resolution": map.info.resolution,
-        "data": map.data.tolist()
+        "width": WMAP,
+        "height": HMAP,
+        "cell_size": map.info.resolution,
+        "data": (np.asarray(map.data, dtype=np.int8).reshape(map.info.height, map.info.width)[OMAPY:OMAPY+HMAP, OMAPX:OMAPX+WMAP]).tolist()
     }
     return ret
 
@@ -154,12 +159,12 @@ class FileSubscriber():
             "robot": {
                     "x": self.robot_x,
                     "y": self.robot_y,
-                    "a": self.robot_yaw,
+                    "angle": self.robot_yaw,
                     "linear_vel": self.linear_vel,
                     "angular_vel": self.angular_vel,
-                    "goalx": self.rgx,
-                    "goaly": self.rgy,
-                    "goala": self.rga
+                    "goal_x": self.rgx,
+                    "goal_y": self.rgy,
+                    "goal_a": self.rga
                 },
             "people": self.humans,
             "objects": self.objects,
@@ -311,15 +316,20 @@ class FileSubscriber():
         self.x_orig = origin.position.x*self.org_map_resolution
         self.y_orig = origin.position.y*self.org_map_resolution
 
+        msg.data[msg.data==50] = -1
+        msg.data[msg.data==100] = 1
         self.map_data = np.asarray(msg.data, dtype=np.int8).reshape(self.org_map_height, self.org_map_width)
-        self.map_data[self.map_data==-1] = 50
-        self.map_data = self.map_data[MAP_ROWS_OFFSET:MAP_ROWS_END , MAP_COLS_OFFSET:MAP_COLS_END].astype(np.uint8)[:,::-1]
-        self.map_data[self.map_data==50] = 127
-        self.map_data[self.map_data==100] = 255
+        # self.map_data[self.map_data==-1] = 50
+        self.map_data = self.map_data[MAP_ROWS_OFFSET:MAP_ROWS_END , MAP_COLS_OFFSET:MAP_COLS_END][:,::-1]
+        # self.map_data[self.map_data==50] = 127
+        # self.map_data[self.map_data==100] = 1
         self.map_data = cv2.resize(self.map_data, None, fx=ORG_MAP_SCALE, fy=ORG_MAP_SCALE, interpolation= cv2.INTER_NEAREST)
-        self.canvas_stored[:,:,0] = 255-self.map_data[:,:]
-        self.canvas_stored[:,:,1] = 255-self.map_data[:,:]
-        self.canvas_stored[:,:,2] = 255-self.map_data[:,:]
+        gray_map_data = copy.deepcopy(self.map_data).astype(np.uint8)
+        gray_map_data[gray_map_data==-1] = 127
+        gray_map_data[gray_map_data==1] = 255
+        self.canvas_stored[:,:,0] = 255-gray_map_data[:,:]
+        self.canvas_stored[:,:,1] = 255-gray_map_data[:,:]
+        self.canvas_stored[:,:,2] = 255-gray_map_data[:,:]
         self.map_mult = self.org_map_resolution/ORG_MAP_SCALE
 
         self.map_msg = msg
