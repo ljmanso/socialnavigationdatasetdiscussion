@@ -79,8 +79,8 @@ def draw_wall(w, canvas, map_mult, color=None):
 
 def json_struct_from_map(main, map):
     print(map)
-    WMAP = 300
-    HMAP = 300
+    WMAP = 400
+    HMAP = 400
     OMAPY = (map.info.height-HMAP)//2
     OMAPX = (map.info.width-WMAP)//2
     ret = {
@@ -142,7 +142,7 @@ class FileSubscriber():
         self.linear_vel = [0.,0.]
         self.angular_vel = 0.
         self.rgx = self.rgy = self.rga = 0
-        self.timestamp = 0
+        self.timestamp = None
         self.objects = objects
         self.walls = walls
         self.humans = []
@@ -353,11 +353,16 @@ if __name__ == "__main__":
     wfd = open(sys.argv[1], "rb")
 
     while True:
-        # Process message
         try:
+            # Load next message from file
             msg = pickle.load(wfd)
             if type(msg) != type({}):
-                continue
+                print(msg)
+                print(type(msg))
+                sys.exit(-1)
+            # Update timestamp
+            stuff.timestamp = msg["time"]
+            # Process message
             if msg["type"] == "map":
                 stuff.listener_map(msg["data"])
             elif msg["type"] == "goal":

@@ -9,5 +9,4 @@ for pre in $l; do
     echo "Generating JSON for $trj."
     python3 sn3_to_json.py $trj 2> /dev/null
 
-
 done
