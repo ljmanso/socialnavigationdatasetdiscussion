@@ -36,13 +36,27 @@ data_structure = {
 
 concatenated = None
 
-objects = json.load(open("objects.json","r"))
+json_objects = json.load(open("objects.json","r"))
+objects = []
+for id, o in enumerate(json_objects):
+    objects.append({
+        "id": id,
+        "type": o["type"],
+        "x": o["x"],
+        "y": o["y"],
+        "angle": np.pi/2.-o["angle"],
+        "size": [o["width"], o["depth"]]
+        })
 walls = json.load(open("walls.json","r"))
+walls = [w[0]+w[1] for w in walls]
 
 
 def rotate(x, y, radians):
-    xx = x * np.cos(radians) + y * np.sin(radians)
-    yy = -x * np.sin(radians) + y * np.cos(radians)
+    xx = -x * np.sin(radians) + y * np.cos(radians)
+    yy = x * np.cos(radians) + y * np.sin(radians)
+
+    # xx = x * np.cos(radians) + y * np.sin(radians)
+    # yy = -x * np.sin(radians) + y * np.cos(radians)
     return [xx, yy]
 
 def draw_object(o, canvas, map_mult):
@@ -54,11 +68,11 @@ def draw_object(o, canvas, map_mult):
         draw_rectangle(o, canvas, map_mult, (100,100,100))
 
 def draw_rectangle(o, canvas, map_mult, color):
-    pts = np.array([rotate(-o["width"]/2, -o["depth"]/2, o["angle"]),
-                    rotate(-o["width"]/2, +o["depth"]/2, o["angle"]),
-                    rotate(+o["width"]/2, +o["depth"]/2, o["angle"]),
-                    rotate(+o["width"]/2, -o["depth"]/2, o["angle"]),
-                    rotate(-o["width"]/2, -o["depth"]/2, o["angle"])])
+    pts = np.array([rotate(-o["size"][0]/2, -o["size"][1]/2, o["angle"]),
+                    rotate(-o["size"][0]/2, +o["size"][1]/2, o["angle"]),
+                    rotate(+o["size"][0]/2, +o["size"][1]/2, o["angle"]),
+                    rotate(+o["size"][0]/2, -o["size"][1]/2, o["angle"]),
+                    rotate(-o["size"][0]/2, -o["size"][1]/2, o["angle"])])
     offset = np.array([o["x"], o["y"]])
     pts += offset
     pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
@@ -71,10 +85,10 @@ def draw_wall(w, canvas, map_mult, color=None):
         c = (0,0,190)
     else:
         c = color
-    pt1x = int((-(w[0][0])/map_mult)+MAP_COLS_HLEN+420)
-    pt1y = int(MAP_COLS_HLEN-(-(w[0][1])/map_mult)+120)
-    pt2x = int((-(w[1][0])/map_mult)+MAP_COLS_HLEN+420)
-    pt2y = int(MAP_COLS_HLEN-(-(w[1][1])/map_mult)+120)
+    pt1x = int((-(w[0])/map_mult)+MAP_COLS_HLEN+420)
+    pt1y = int(MAP_COLS_HLEN-(-(w[1])/map_mult)+120)
+    pt2x = int((-(w[2])/map_mult)+MAP_COLS_HLEN+420)
+    pt2y = int(MAP_COLS_HLEN-(-(w[3])/map_mult)+120)
     cv2.line(canvas, (pt1x, pt1y), (pt2x, pt2y), c, thickness=4)
 
 def json_struct_from_map(main, map):
