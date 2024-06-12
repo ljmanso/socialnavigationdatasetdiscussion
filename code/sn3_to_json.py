@@ -80,6 +80,39 @@ def draw_rectangle(o, canvas, map_mult, color):
     pts = pts.reshape((1,-1,2)).astype(np.int32)
     cv2.fillPoly(canvas, pts, color)
 
+
+def draw_person(p, canvas, map_mult):
+    w = 0.44 / 2.
+    d = 0.28 / 2
+    a = p["angle"]
+    offset = np.array([p["x"], p["y"]])
+
+    pts = np.array([rotate(-w, -d, a),
+                    rotate(-w, +d, a),
+                    rotate(-0.1, +d, a),
+                    rotate(+0.0, +d*1.5, a),
+                    rotate(+0.1, +d, a),
+                    rotate(+w, +d, a),
+                    rotate(+w, -d, a),
+                    rotate(-w, -d, a)])
+    pts += offset
+    pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
+    pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
+    pts = pts.reshape((1,-1,2)).astype(np.int32)
+    cv2.fillPoly(canvas, pts, (20, 20, 60))
+
+    pts = np.array([rotate(-0.1, +d, a),
+                    rotate(+0.0, +d*1.5, a),
+                    rotate(+0.1, +d, a),
+                    rotate(+0.0, +d*0.5, a),
+                    rotate(-0.1, +d, a)])
+    pts += offset
+    pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
+    pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
+    pts = pts.reshape((1,-1,2)).astype(np.int32)
+    cv2.fillPoly(canvas, pts, (160, 120, 60))
+
+
 def draw_wall(w, canvas, map_mult, color=None):
     if color is None:
         c = (0,0,190)
@@ -220,31 +253,32 @@ class FileSubscriber():
                 skeleton = self.skeletons[skeleton_idx]
                 if len(skeleton)<18:
                     continue
-                for joint in range(18):
-                    x_idx = joint*3
-                    y_idx = x_idx+1
-                    x = skeleton[x_idx]
-                    y = skeleton[y_idx]
-                    x2d = int(-(x)/self.map_mult)+MAP_COLS_HLEN+420
-                    y2d = MAP_COLS_HLEN-int(-(y)/self.map_mult)+120
-                    if joint in (2,4,6,8,10,12,14,16):
-                        color = (255,150,150)
-                    elif joint in (1,3,5,7,9,11,13,15):
-                        color = (150,150,255)
-                    else:
-                        color = (120,225,225)
-                    if DRAW_JOINTS:
-                        cv2.circle(self.canvas, (x2d, y2d), 4, color, 2)
+                # for joint in range(18):
+                #     x_idx = joint*3
+                #     y_idx = x_idx+1
+                #     x = skeleton[x_idx]
+                #     y = skeleton[y_idx]
+                #     x2d = int(-(x)/self.map_mult)+MAP_COLS_HLEN+420
+                #     y2d = MAP_COLS_HLEN-int(-(y)/self.map_mult)+120
+                #     if joint in (2,4,6,8,10,12,14,16):
+                #         color = (255,150,150)
+                #     elif joint in (1,3,5,7,9,11,13,15):
+                #         color = (150,150,255)
+                #     else:
+                #         color = (120,225,225)
+                #     if DRAW_JOINTS:
+                #         cv2.circle(self.canvas, (x2d, y2d), 4, color, 2)
                 # Draw as a oriented circle
-                hx = self.humans[skeleton_idx]["x"]
-                hy = self.humans[skeleton_idx]["y"]
-                hangle = self.humans[skeleton_idx]["angle"]
-                cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+420
-                cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+120
-                x2 = cx + int(25*np.cos(-hangle+self.map_yaw+np.pi))
-                y2 = cy + int(25*np.sin(-hangle+self.map_yaw+np.pi))
-                cv2.circle(self.canvas, (cx, cy), HUMAN_WIDTH, (0,0,0), 2)
-                cv2.line(self.canvas, (cx, cy), (x2, y2), (0,0,255), 2)
+                draw_person(self.humans[skeleton_idx], self.canvas, self.map_mult)
+                # hx = self.humans[skeleton_idx]["x"]
+                # hy = self.humans[skeleton_idx]["y"]
+                # hangle = self.humans[skeleton_idx]["angle"]
+                # cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+420
+                # cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+120
+                # x2 = cx + int(25*np.cos(-hangle+self.map_yaw+np.pi))
+                # y2 = cy + int(25*np.sin(-hangle+self.map_yaw+np.pi))
+                # cv2.circle(self.canvas, (cx, cy), HUMAN_WIDTH, (0,0,0), 2)
+                # cv2.line(self.canvas, (cx, cy), (x2, y2), (0,0,255), 2)
 
 
         # Draw goal
