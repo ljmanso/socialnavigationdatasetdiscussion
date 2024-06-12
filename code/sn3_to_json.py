@@ -128,8 +128,8 @@ def json_struct_from_map(main, map):
     print(map)
     WMAP = 300
     HMAP = 300
-    OMAPY = int((map.info.height-HMAP)/2 - (map.info.origin.position.x*0.01/map.info.resolution))
-    OMAPX = int((map.info.width-WMAP)/2 - (map.info.origin.position.x*0.01/map.info.resolution))
+    OMAPY = int(-map.info.origin.position.y / map.info.resolution -HMAP/2) 
+    OMAPX = int(-map.info.origin.position.x / map.info.resolution -WMAP/2) 
     ret = {
         "width": WMAP,
         "height": HMAP,
