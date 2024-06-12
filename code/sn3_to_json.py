@@ -93,10 +93,10 @@ def draw_wall(w, canvas, map_mult, color=None):
 
 def json_struct_from_map(main, map):
     print(map)
-    WMAP = 400
-    HMAP = 400
-    OMAPY = (map.info.height-HMAP)//2
-    OMAPX = (map.info.width-WMAP)//2
+    WMAP = 300
+    HMAP = 300
+    OMAPY = int((map.info.height-HMAP)/2 - (map.info.origin.position.x*0.01/map.info.resolution))
+    OMAPX = int((map.info.width-WMAP)/2 - (map.info.origin.position.x*0.01/map.info.resolution))
     ret = {
         "width": WMAP,
         "height": HMAP,
