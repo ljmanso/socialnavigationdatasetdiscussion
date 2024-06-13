@@ -19,8 +19,23 @@ except:
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w,h), 0.5, (w,h))
 mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5)
 
+DESC = sys.argv[2]
+VID = "video" in sys.argv
+
 DRAW_JOINTS = False
-ROBOT_WIDTH = 23
+DRAW_CIRCLE = False
+DRAW_SQUARE = False
+if DESC == "joints":
+    DRAW_JOINTS = True
+elif DESC == "circles":
+    DRAW_CIRCLE = True
+elif DESC == "polygons":
+    DRAW_SQUARE = True
+else:
+    DRAW_SQUARE = True
+
+
+ROBOT_WIDTH = 20
 HUMAN_WIDTH = 23
 FPS = 25
 
@@ -82,35 +97,43 @@ def draw_rectangle(o, canvas, map_mult, color):
 
 
 def draw_person(p, canvas, map_mult):
-    w = 0.44 / 2.
-    d = 0.28 / 2
+    w = 0.45 / 2.
+    d = 0.2 / 2
     a = p["angle"]
     offset = np.array([p["x"], p["y"]])
 
-    pts = np.array([rotate(-w, -d, a),
-                    rotate(-w, +d, a),
-                    rotate(-0.1, +d, a),
-                    rotate(+0.0, +d*1.5, a),
-                    rotate(+0.1, +d, a),
-                    rotate(+w, +d, a),
-                    rotate(+w, -d, a),
-                    rotate(-w, -d, a)])
+    rr = 0.05
+    pts = np.array([rotate( 0, -d, a),
+
+                    rotate(-(w-rr), -d, a),
+                    rotate(-w, -(d-0.05), a),
+
+                    rotate(-w, +(d-rr), a),
+                    rotate(-(w-rr), +d, a),
+
+                    rotate(+(w-rr), +d, a),
+                    rotate(+w, +(d-rr), a),
+
+                    rotate(+w, -(d-rr), a),
+                    rotate(+(w-rr), -d, a),
+
+                    rotate(0, -d, a)])
     pts += offset
     pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
     pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
     pts = pts.reshape((1,-1,2)).astype(np.int32)
     cv2.fillPoly(canvas, pts, (20, 20, 60))
 
-    pts = np.array([rotate(-0.1, +d, a),
-                    rotate(+0.0, +d*1.5, a),
-                    rotate(+0.1, +d, a),
-                    rotate(+0.0, +d*0.5, a),
-                    rotate(-0.1, +d, a)])
-    pts += offset
-    pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
-    pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
-    pts = pts.reshape((1,-1,2)).astype(np.int32)
-    cv2.fillPoly(canvas, pts, (160, 120, 60))
+    pts = np.array(rotate(0, 0.05, a)) + offset
+    pts[0] = (-(pts[0])/map_mult)+MAP_COLS_HLEN+420
+    pts[1] = MAP_COLS_HLEN-(-(pts[1])/map_mult)+120
+    pts = pts.astype(np.int32)
+    cv2.circle(canvas, (pts[0], pts[1]), 6, (50,40,170), -1)
+    pts = np.array(rotate(0, 0.12, a)) + offset
+    pts[0] = (-(pts[0])/map_mult)+MAP_COLS_HLEN+420
+    pts[1] = MAP_COLS_HLEN-(-(pts[1])/map_mult)+120
+    pts = pts.astype(np.int32)
+    cv2.circle(canvas, (pts[0], pts[1]), 2, (50,40,170), -1)
 
 
 def draw_wall(w, canvas, map_mult, color=None):
@@ -253,32 +276,33 @@ class FileSubscriber():
                 skeleton = self.skeletons[skeleton_idx]
                 if len(skeleton)<18:
                     continue
-                # for joint in range(18):
-                #     x_idx = joint*3
-                #     y_idx = x_idx+1
-                #     x = skeleton[x_idx]
-                #     y = skeleton[y_idx]
-                #     x2d = int(-(x)/self.map_mult)+MAP_COLS_HLEN+420
-                #     y2d = MAP_COLS_HLEN-int(-(y)/self.map_mult)+120
-                #     if joint in (2,4,6,8,10,12,14,16):
-                #         color = (255,150,150)
-                #     elif joint in (1,3,5,7,9,11,13,15):
-                #         color = (150,150,255)
-                #     else:
-                #         color = (120,225,225)
-                #     if DRAW_JOINTS:
-                #         cv2.circle(self.canvas, (x2d, y2d), 4, color, 2)
-                # Draw as a oriented circle
-                draw_person(self.humans[skeleton_idx], self.canvas, self.map_mult)
-                # hx = self.humans[skeleton_idx]["x"]
-                # hy = self.humans[skeleton_idx]["y"]
-                # hangle = self.humans[skeleton_idx]["angle"]
-                # cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+420
-                # cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+120
-                # x2 = cx + int(25*np.cos(-hangle+self.map_yaw+np.pi))
-                # y2 = cy + int(25*np.sin(-hangle+self.map_yaw+np.pi))
-                # cv2.circle(self.canvas, (cx, cy), HUMAN_WIDTH, (0,0,0), 2)
-                # cv2.line(self.canvas, (cx, cy), (x2, y2), (0,0,255), 2)
+                if DRAW_JOINTS:
+                    for joint in range(18):
+                        x_idx = joint*3
+                        y_idx = x_idx+1
+                        x = skeleton[x_idx]
+                        y = skeleton[y_idx]
+                        x2d = int(-(x)/self.map_mult)+MAP_COLS_HLEN+420
+                        y2d = MAP_COLS_HLEN-int(-(y)/self.map_mult)+120
+                        if joint in (2,4,6,8,10,12,14,16):
+                            color = (255,150,150)
+                        elif joint in (1,3,5,7,9,11,13,15):
+                            color = (150,150,255)
+                        else:
+                            color = (120,225,225)
+                        cv2.circle(self.canvas, (x2d, y2d), 4, color, 2)
+                elif DRAW_SQUARE: # Draw as a polygon
+                    draw_person(self.humans[skeleton_idx], self.canvas, self.map_mult)
+                elif DRAW_CIRCLE: # Draw as a oriented circle
+                    hx = self.humans[skeleton_idx]["x"]
+                    hy = self.humans[skeleton_idx]["y"]
+                    hangle = self.humans[skeleton_idx]["angle"]
+                    cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+420
+                    cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+120
+                    x2 = cx + int(25*np.cos(-hangle+self.map_yaw+np.pi))
+                    y2 = cy + int(25*np.sin(-hangle+self.map_yaw+np.pi))
+                    cv2.circle(self.canvas, (cx, cy), HUMAN_WIDTH, (0,0,0), 2)
+                    cv2.line(self.canvas, (cx, cy), (x2, y2), (0,0,255), 2)
 
 
         # Draw goal
@@ -305,26 +329,31 @@ class FileSubscriber():
         concatenate = [rotated]
 
         # Draw video
-        f = np.zeros((720, 1280), dtype=np.uint8)
-        for k in self.video.keys():
-            if self.video[k] is not None:
-                # cv2.imshow(k, self.video[k])
-                global mapx, mapy, roi
-                f[:, 160:-160] = cv2.resize(self.video[k], (0,0), fx=1.5, fy=1.5)
-                dst = cv2.remap(f, mapx, mapy, cv2.INTER_LINEAR)
-                dst = dst[8:520, 415:1210]
-                new_width = int(float(dst.shape[1]*rotated.shape[0])/float(dst.shape[0]))
-                dst = cv2.resize(dst, (new_width, rotated.shape[0]), cv2.INTER_CUBIC)
-                concatenate.append(cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR))
-                # cv2.imshow(f"{k} undistorted", dst)
+        if VID:
+            f = np.zeros((720, 1280), dtype=np.uint8)
+            for k in self.video.keys():
+                if self.video[k] is not None:
+                    # cv2.imshow(k, self.video[k])
+                    global mapx, mapy, roi
+                    f[:, 160:-160] = cv2.resize(self.video[k], (0,0), fx=1.5, fy=1.5)
+                    dst = cv2.remap(f, mapx, mapy, cv2.INTER_LINEAR)
+                    dst = dst[8:520, 415:1210]
+                    new_width = int(float(dst.shape[1]*rotated.shape[0])/float(dst.shape[0]))
+                    dst = cv2.resize(dst, (new_width, rotated.shape[0]), cv2.INTER_CUBIC)
+                    concatenate.append(cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR))
+                    # cv2.imshow(f"{k} undistorted", dst)
 
         global concatenated
         concatenated = np.concatenate(concatenate, axis=1)
 
         global writer
         if writer == None:
+            if VID is True:
+                v = "video"
+            else:
+                v = "novideo"
             writer = cv2.VideoWriter(
-                sys.argv[1].replace(".pickle", ".avi"),
+                sys.argv[1].replace(".pickle", f"_{DESC}_{v}.avi"),
                 cv2.VideoWriter_fourcc('M','J','P','G'),
                 FPS,
                 (concatenated.shape[1], concatenated.shape[0]))

@@ -7,6 +7,10 @@ for pre in $l; do
     echo "Joining $pre and $dat"
     pytho3 join.py $nop 2> /dev/null
     echo "Generating JSON for $trj."
-    python3 sn3_to_json.py $trj 2> /dev/null
+    for mode in "joints" "circles" "polygons"; do
+        for video in "video" "nope"; do
+            python3 sn3_to_json.py $trj $mode $video #2> /dev/null
+        done
+    done
 
 done
