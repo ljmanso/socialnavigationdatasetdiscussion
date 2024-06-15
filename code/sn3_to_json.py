@@ -22,6 +22,10 @@ mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5
 DESC = sys.argv[2]
 VID = "video" in sys.argv
 
+
+XOFFSET = 435
+YOFFSET = 125
+
 DRAW_JOINTS = False
 DRAW_CIRCLE = False
 DRAW_SQUARE = False
@@ -52,6 +56,10 @@ data_structure = {
 concatenated = None
 
 json_objects = json.load(open("objects.json","r"))
+# for object_idx in range(len(json_objects)):
+#     json_objects[object_idx]["x"] += +0.15
+#     json_objects[object_idx]["y"] += -0.07
+# json.dump(json_objects, open("objects_new.json","w"))
 objects = []
 for id, o in enumerate(json_objects):
     objects.append({
@@ -62,7 +70,15 @@ for id, o in enumerate(json_objects):
         "angle": np.pi/2.-o["angle"],
         "size": [o["width"], o["depth"]]
         })
+
 walls = json.load(open("walls.json","r"))
+# for wall_idx in range(len(walls)):
+#     walls[wall_idx][0][0] += +0.15
+#     walls[wall_idx][1][0] += +0.15
+#     walls[wall_idx][0][1] += -0.07
+#     walls[wall_idx][1][1] += -0.07
+# json.dump(walls, open("walls_new.json","w"))
+
 walls = [w[0]+w[1] for w in walls]
 
 
@@ -90,8 +106,8 @@ def draw_rectangle(o, canvas, map_mult, color):
                     rotate(-o["size"][0]/2, -o["size"][1]/2, o["angle"])])
     offset = np.array([o["x"], o["y"]])
     pts += offset
-    pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
-    pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
+    pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+XOFFSET
+    pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+YOFFSET
     pts = pts.reshape((1,-1,2)).astype(np.int32)
     cv2.fillPoly(canvas, pts, color)
 
@@ -119,19 +135,19 @@ def draw_person(p, canvas, map_mult):
 
                     rotate(0, -d, a)])
     pts += offset
-    pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
-    pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
+    pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+XOFFSET
+    pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+YOFFSET
     pts = pts.reshape((1,-1,2)).astype(np.int32)
     cv2.fillPoly(canvas, pts, (20, 20, 60))
 
     pts = np.array(rotate(0, 0.05, a)) + offset
-    pts[0] = (-(pts[0])/map_mult)+MAP_COLS_HLEN+420
-    pts[1] = MAP_COLS_HLEN-(-(pts[1])/map_mult)+120
+    pts[0] = (-(pts[0])/map_mult)+MAP_COLS_HLEN+XOFFSET
+    pts[1] = MAP_COLS_HLEN-(-(pts[1])/map_mult)+YOFFSET
     pts = pts.astype(np.int32)
     cv2.circle(canvas, (pts[0], pts[1]), 6, (50,40,170), -1)
     pts = np.array(rotate(0, 0.12, a)) + offset
-    pts[0] = (-(pts[0])/map_mult)+MAP_COLS_HLEN+420
-    pts[1] = MAP_COLS_HLEN-(-(pts[1])/map_mult)+120
+    pts[0] = (-(pts[0])/map_mult)+MAP_COLS_HLEN+XOFFSET
+    pts[1] = MAP_COLS_HLEN-(-(pts[1])/map_mult)+YOFFSET
     pts = pts.astype(np.int32)
     cv2.circle(canvas, (pts[0], pts[1]), 2, (50,40,170), -1)
 
@@ -141,16 +157,16 @@ def draw_wall(w, canvas, map_mult, color=None):
         c = (0,0,190)
     else:
         c = color
-    pt1x = int((-(w[0])/map_mult)+MAP_COLS_HLEN+420)
-    pt1y = int(MAP_COLS_HLEN-(-(w[1])/map_mult)+120)
-    pt2x = int((-(w[2])/map_mult)+MAP_COLS_HLEN+420)
-    pt2y = int(MAP_COLS_HLEN-(-(w[3])/map_mult)+120)
+    pt1x = int((-(w[0])/map_mult)+MAP_COLS_HLEN+XOFFSET)
+    pt1y = int(MAP_COLS_HLEN-(-(w[1])/map_mult)+YOFFSET)
+    pt2x = int((-(w[2])/map_mult)+MAP_COLS_HLEN+XOFFSET)
+    pt2y = int(MAP_COLS_HLEN-(-(w[3])/map_mult)+YOFFSET)
     cv2.line(canvas, (pt1x, pt1y), (pt2x, pt2y), c, thickness=4)
 
 def json_struct_from_map(main, map):
     print(map)
-    WMAP = 300
-    HMAP = 300
+    WMAP = 350
+    HMAP = 350
     OMAPY = int(-map.info.origin.position.y / map.info.resolution -HMAP/2) 
     OMAPX = int(-map.info.origin.position.x / map.info.resolution -WMAP/2) 
     ret = {
@@ -261,8 +277,8 @@ class FileSubscriber():
             self.robot_x = position.x
             self.robot_y = position.y
             self.robot_yaw = euler_from_quaternion(self.pose_msg.orientation)[2]
-            rx = int(-(self.robot_x)/self.map_mult)+MAP_COLS_HLEN+420
-            ry = MAP_COLS_HLEN-int(-(self.robot_y)/self.map_mult)+120
+            rx = int(-(self.robot_x)/self.map_mult)+MAP_COLS_HLEN+XOFFSET
+            ry = MAP_COLS_HLEN-int(-(self.robot_y)/self.map_mult)+YOFFSET
             x2 = rx + int(25*np.cos(-self.robot_yaw+self.map_yaw+np.pi))
             y2 = ry + int(25*np.sin(-self.robot_yaw+self.map_yaw+np.pi))
             cv2.circle(self.canvas, (rx, ry), ROBOT_WIDTH, (255,0,0), 2)
@@ -282,8 +298,8 @@ class FileSubscriber():
                         y_idx = x_idx+1
                         x = skeleton[x_idx]
                         y = skeleton[y_idx]
-                        x2d = int(-(x)/self.map_mult)+MAP_COLS_HLEN+420
-                        y2d = MAP_COLS_HLEN-int(-(y)/self.map_mult)+120
+                        x2d = int(-(x)/self.map_mult)+MAP_COLS_HLEN+XOFFSET
+                        y2d = MAP_COLS_HLEN-int(-(y)/self.map_mult)+YOFFSET
                         if joint in (2,4,6,8,10,12,14,16):
                             color = (255,150,150)
                         elif joint in (1,3,5,7,9,11,13,15):
@@ -297,8 +313,8 @@ class FileSubscriber():
                     hx = self.humans[skeleton_idx]["x"]
                     hy = self.humans[skeleton_idx]["y"]
                     hangle = self.humans[skeleton_idx]["angle"]
-                    cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+420
-                    cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+120
+                    cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+XOFFSET
+                    cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+YOFFSET
                     x2 = cx + int(25*np.cos(-hangle+self.map_yaw+np.pi))
                     y2 = cy + int(25*np.sin(-hangle+self.map_yaw+np.pi))
                     cv2.circle(self.canvas, (cx, cy), HUMAN_WIDTH, (0,0,0), 2)
@@ -317,15 +333,15 @@ class FileSubscriber():
             else:
                 color = tuple((0,0.35,0.65))
             self.rga = euler_from_tuple(quat)[2]
-            gx = int(-(self.rgx)/self.map_mult)+MAP_COLS_HLEN+420
-            gy = MAP_COLS_HLEN-int(-(self.rgy)/self.map_mult)+120
+            gx = int(-(self.rgx)/self.map_mult)+MAP_COLS_HLEN+XOFFSET
+            gy = MAP_COLS_HLEN-int(-(self.rgy)/self.map_mult)+YOFFSET
             x2 = gx + int(25*np.cos(-self.rga+self.map_yaw+np.pi))
             y2 = gy + int(25*np.sin(-self.rga+self.map_yaw+np.pi))
             cv2.circle(self.canvas, (gx, gy), ROBOT_WIDTH, color, 2)
             cv2.line(self.canvas, (gx, gy), (x2, y2), (0,0,0), 2)
 
         rotated = np.array(self.canvas)
-        rotated = cv2.warpAffine(rotated, self.R, (rotated.shape[0], rotated.shape[1]), borderValue=(127,127,127))[120:-85, 85:-85]
+        # rotated = cv2.warpAffine(rotated, self.R, (rotated.shape[0], rotated.shape[1]), borderValue=(127,127,127))[120:-85, 85:-85]
         concatenate = [rotated]
 
         # Draw video
@@ -333,7 +349,6 @@ class FileSubscriber():
             f = np.zeros((720, 1280), dtype=np.uint8)
             for k in self.video.keys():
                 if self.video[k] is not None:
-                    # cv2.imshow(k, self.video[k])
                     global mapx, mapy, roi
                     f[:, 160:-160] = cv2.resize(self.video[k], (0,0), fx=1.5, fy=1.5)
                     dst = cv2.remap(f, mapx, mapy, cv2.INTER_LINEAR)
@@ -341,17 +356,16 @@ class FileSubscriber():
                     new_width = int(float(dst.shape[1]*rotated.shape[0])/float(dst.shape[0]))
                     dst = cv2.resize(dst, (new_width, rotated.shape[0]), cv2.INTER_CUBIC)
                     concatenate.append(cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR))
-                    # cv2.imshow(f"{k} undistorted", dst)
 
         global concatenated
         concatenated = np.concatenate(concatenate, axis=1)
 
         global writer
+        if VID is True:
+            v = "video"
+        else:
+            v = "novideo"
         if writer == None:
-            if VID is True:
-                v = "video"
-            else:
-                v = "novideo"
             writer = cv2.VideoWriter(
                 sys.argv[1].replace(".pickle", f"_{DESC}_{v}.avi"),
                 cv2.VideoWriter_fourcc('M','J','P','G'),
@@ -359,7 +373,7 @@ class FileSubscriber():
                 (concatenated.shape[1], concatenated.shape[0]))
         writer.write(concatenated)
 
-        cv2.imshow("view", concatenated)
+        cv2.imshow(sys.argv[1].replace(".pickle", f"_{DESC}_{v}.avi"), concatenated)
 
 
 
