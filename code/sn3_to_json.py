@@ -243,14 +243,18 @@ class FileSubscriber():
         ret = {
             "timestamp": self.timestamp,
             "robot": {
+                    "radius": 0.25,
                     "x": self.robot_x,
                     "y": self.robot_y,
                     "angle": self.robot_yaw,
-                    "linear_vel": self.linear_vel,
-                    "angular_vel": self.angular_vel,
+                    "speed_x": self.linear_vel,
+                    "speed_y": 0.,
+                    "speed_a": self.angular_vel,
                     "goal_x": self.rgx,
                     "goal_y": self.rgy,
-                    "goal_a": self.rga
+                    "goal_angle": self.rga,
+                    "goal_pos_th": 0.1,
+                    "goal_angle_th": 0.1
                 },
             "people": self.humans,
             "objects": self.objects,
