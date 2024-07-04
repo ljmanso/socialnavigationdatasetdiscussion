@@ -56,8 +56,6 @@ def draw_object(o, canvas, map_mult):
         pts[:,0] = (-(pts[:,0])/map_mult)+MAP_COLS_HLEN+420
         pts[:,1] = MAP_COLS_HLEN-(-(pts[:,1])/map_mult)+120
         pts = pts.reshape((1,-1,2)).astype(np.int32)
-        print(f"p{pts.shape=}   {pts.dtype=}")
-        print(f"p{pts}")
         cv2.fillPoly(canvas, pts, (100,0,155))
 
 def json_struct_from_map(main, map):
@@ -261,6 +259,10 @@ class FileSubscriber():
     def listener_pose(self, msg):
         self.pose_msg = msg
 
+    def listener_command(self, msg):
+        # print("command", msg)
+        self.command_msg = msg
+
 
     def listener_laser(self, msg):
         self.laser_msg = msg
@@ -319,9 +321,15 @@ if __name__ == "__main__":
             elif msg["type"] == "laser":
                 stuff.listener_laser(msg["data"])
             elif msg["type"] == "humans":
-                stuff.skeletons = msg["data"]
+                stuff.skeletons = np.array(msg["data"])
+                print(stuff.skeletons.shape)
             elif msg["type"].startswith("video"):
                 stuff.video[msg["type"]] = msg["data"]
+            elif msg["type"] == "command":
+                stuff.listener_command(msg["data"])
+            else:
+                print("Message type not handled?", msg["type"])
+                sys.exit(1)
         except EOFError:
             break
 

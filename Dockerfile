@@ -3,7 +3,7 @@
 # sudo docker build -t sn3 .
 #
 # To run it:
-# sudo docker run -it --net=host --rm --gpus all -v $(pwd):/project -w /project sn3 bash
+# sudo docker run -it --device /dev/video6:/dev/video6 --net=host --rm --gpus all -v $(pwd):/project -w /project sn3 bash
 #
 # To connect to the X server:
 # xtightvncviewer localhost:5920

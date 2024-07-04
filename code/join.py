@@ -9,6 +9,8 @@ import geometry_msgs
 import nav_msgs
 import sensor_msgs
 
+from sn3noros import *
+
 def pose2noros(data):
     position = Point(x=data.position.x, y=data.position.y, z=data.position.z)
     orientation = Quaternion(x=data.orientation.x, y=data.orientation.y, z=data.orientation.z, w=data.orientation.w)
@@ -69,11 +71,12 @@ def ros2noros(msg):
 
 
 def ros2dict(msg):
-    return {
+    ret = {
         "type": msg["type"],
         "time": msg["time"],
         "data": ros2noros(msg)
         }
+    return ret
 
 if __name__ == "__main__":
     seed_filename = sys.argv[1]
