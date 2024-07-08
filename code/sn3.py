@@ -21,10 +21,51 @@ if vid is None:
     sys.exit(-1)
 print(vid)
 
+vid.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+vid.set(cv2.CAP_PROP_FRAME_HEIGHT, 1024)
+
+
+
 import pickle
 
 import sys, Ice
 import pose3DI
+
+from dt_apriltags import *
+from pytransform3d import rotations as pr
+from pytransform3d import transformations as pt
+from pytransform3d.transform_manager import TransformManager
+from pytransform3d.plot_utils import remove_frame
+import matplotlib.pyplot as plt
+
+cmap = np.zeros((800, 800, 3), dtype=np.uint8)
+
+try:
+    with open('calibration.pickle', 'rb') as handle:
+        ret, mtx, dist, rvecs, tvecs, h, w, mtx, dist, rvecs, tvecs = pickle.load(handle)
+except:
+    print("Can't get calibration file")
+    sys.exit(-1)
+
+print(f"{w=} {h=}")
+newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w,h), 0, (w,h))
+fx = newcameramtx[0,0]
+fy = newcameramtx[1,1]
+cx = newcameramtx[0,2]
+cy = newcameramtx[1,2]
+print(newcameramtx)
+mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5)
+
+
+detector = Detector(searchpath=['apriltags'], families='tagStandard41h12',
+                nthreads=5, quad_decimate=1.0, quad_sigma=0.1, refine_edges=1,
+                decode_sharpening=0.25, debug=0)
+cam_prms = [fx, fy, cx, cy]
+# print(f'cam_prms {cam_prms}')
+
+TAG_SIZE=0.415
+SMALL_TAG_SIZE=0.283*5./9.
+
 
 global wfd
 wfd = None
@@ -45,13 +86,57 @@ if not pose:
     raise RuntimeError("Invalid proxy")
 else:
     print('valid proxy')
- 
-# cam_proxy = communicator.stringToProxy("pose:default -h 192.168.88.104 -p 10101")
-# goal_data_prx = RoboCompPose.PosePrx.checkedCast(cam_proxy)
-# if not goal_data_prx:
-#     raise RuntimeError("Invalid proxy cam1")
-# else:
-#     print('valid proxy cam1')
+
+transformFR = pickle.load(open("objectZ.pkl", "rb"))
+print("transformFR")
+print("transformFR")
+print("transformFR")
+print(transformFR)
+tm = TransformManager()
+# tm.add_transform("camera", "root", transformFR)
+tm.add_transform("root", "camera", transformFR)
+
+
+def draw_transform(cmap, t, yaw):
+    xc = int(t[0] * 60 + 400)
+    yc = int(t[1] * 60 + 400)
+    cv2.circle(cmap, (xc, yc), 10, (0, 255, 0), 2)
+    xc2 = xc + int(np.cos(yaw)*20)
+    yc2 = yc + int(np.sin(yaw)*20)
+    cv2.line(cmap, (xc, yc), (xc2, yc2), (0, 255, 0), 2)
+
+def process_image_get_tags(frame):
+    results = []
+    tags = detector.detect(frame, estimate_tag_pose=True, camera_params=cam_prms, tag_size=SMALL_TAG_SIZE)
+    dst = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    for tag in tags:
+        if tag.tag_id == 0:
+            continue
+        for idx in range(len(tag.corners)):
+            cv2.line(dst, tuple(tag.corners[idx-1, :].astype(int)), tuple(tag.corners[idx, :].astype(int)), (0, 255, 0))
+            cv2.putText(dst, str(tag.tag_id),
+                org=(tag.corners[0, 0].astype(int)+10,tag.corners[0, 1].astype(int)+10),
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=0.8,
+                color=(0, 0, 255))
+        t = tag.pose_t.ravel()
+        cam2tag = pt.transform_from(tag.pose_R, t)
+        tm.remove_transform("object", "camera")
+        tm.add_transform("object", "camera", cam2tag)
+        zero2tag = tm.get_transform("object", "root")
+        # print(zero2tag)
+        rot = zero2tag[:3, :3]
+        yaw = pr.euler_from_matrix(rot, 0, 1, 2, extrinsic=True)[2]
+        draw_transform(cmap, t, yaw)
+        results.append({"id": tag.tag_id, "t": t, "yaw": yaw})
+
+    w2 = dst.shape[1]//2
+    h2 = dst.shape[0]//2
+    dst[h2, :, 2] = 255
+    dst[:, w2, 2] = 255
+    cv2.imshow('frame2', dst)
+    cv2.imshow('map', cmap)
+    return results
 
 
 print_times={}
@@ -370,7 +455,10 @@ def main(args=None):
             draw_time = t
             minimal_subscriber.draw_things()
 
-        if t-cameras_time > 0.1:
+        if t-cameras_time > 0.15:
+            cmap[:,:,:] = 120
+            cmap[400:401, :, 2] = 255
+            cmap[:, 400:401, 2] = 255
             cameras_time = t
             image_ok, frame = vid.read() 
             if image_ok is True:
@@ -378,9 +466,13 @@ def main(args=None):
                 cv2.imshow('frame', frame) 
                 if cv2.waitKey(1) == 27:
                     break
+            frame = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
+            frame = frame[roi[1]:roi[1]+roi[3]+1, roi[0]:roi[0]+roi[2]+1]
+            tags = process_image_get_tags(frame)
             if minimal_subscriber.record is True:
                 # global wfd
-                pickle.dump({"type": "video0", "time": time.time(), "data": frame}, wfd)
+                pickle.dump({"type": "objects", "time": time.time(), "data": tags}, wfd)
+                pickle.dump({"type": "video0",  "time": time.time(), "data": frame}, wfd)
             else:
                 minimal_subscriber.waitqueue.append({"type": "video0", "time": time.time(), "data": frame})
 
