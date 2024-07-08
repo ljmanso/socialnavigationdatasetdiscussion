@@ -56,6 +56,8 @@ def ros2noros(msg):
         return msg["data"]
     elif type(msg["data"]) == np.ndarray:
         return msg["data"]
+    elif type(msg["data"]) == dict:
+        return msg["data"]
     elif type(msg["data"]) == std_msgs.msg._string.String:
         return msg["data"].data
     elif type(msg["data"]) == geometry_msgs.msg._pose.Pose:

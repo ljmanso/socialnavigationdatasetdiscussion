@@ -23,6 +23,7 @@ print_times = {}
 t0file = None
 t0real = time.time()
 
+tags = None
 
 def delay_until(msg):
     global t0file
@@ -47,7 +48,22 @@ def print_msg(msg):
     print(f"time: {msg['time']}", end="")
     print("}")
 
+def draw_tags(tags, ss):
+    if tags is None:
+        return
 
+    for tag in tags.values():
+        t = tag['t']
+        x = t[0]
+        y = t[1]
+        z = t[2]
+        yaw = tag['yaw']
+        x = int(-(x)/ss.map_mult)+MAP_COLS_HLEN+420
+        y = MAP_COLS_HLEN-int(-(y)/ss.map_mult)+120
+        x2 = x + int(25*np.cos(-yaw+ss.map_yaw+np.pi))
+        y2 = y + int(25*np.sin(-yaw+ss.map_yaw+np.pi))
+        cv2.circle(ss.canvas, (x, y), 10, (255,0,0), 2)
+        cv2.line(ss.canvas, (x, y), (x2, y2), (0,255, 0), 2)
 
 class FileSubscriber():
     def __init__(self):
@@ -131,19 +147,19 @@ class FileSubscriber():
             cv2.circle(self.canvas, (gx, gy), 10, color, 2)
             cv2.line(self.canvas, (gx, gy), (x2, y2), (0,0,0), 2)
 
-        # # Draw laser
-        # if self.laser_msg is not None:
-        #     angle = self.laser_msg.angle_min - self.robot_yaw + -0.
-        #     for r in self.laser_msg.ranges:
-        #         if np.isinf(r) is True:
-        #             r = 0
-        #         #convert angle and radius to cartesian coordinates
-        #         lx = r*np.cos(-angle) + self.robot_x
-        #         ly = r*np.sin(- angle) + self.robot_y
-        #         lx = int(-(lx)/self.map_mult)+MAP_COLS_HLEN+420
-        #         ly = MAP_COLS_HLEN-int(-(ly)/self.map_mult)+120
-        #         angle = angle + self.laser_msg.angle_increment
-        #         cv2.circle(self.canvas, (lx, ly), 2, (0.7, 0.7, 0))
+        # Draw laser
+        if self.laser_msg is not None:
+            angle = self.laser_msg.angle_min - self.robot_yaw + -0.
+            for r in self.laser_msg.ranges:
+                if np.isinf(r) is True:
+                    r = 0
+                #convert angle and radius to cartesian coordinates
+                lx = r*np.cos(-angle) + self.robot_x
+                ly = r*np.sin(- angle) + self.robot_y
+                lx = int(-(lx)/self.map_mult)+MAP_COLS_HLEN+420
+                ly = MAP_COLS_HLEN-int(-(ly)/self.map_mult)+120
+                angle = angle + self.laser_msg.angle_increment
+                cv2.circle(self.canvas, (lx, ly), 2, (0.7, 0.7, 0))
 
 
         # Draw video
@@ -151,6 +167,8 @@ class FileSubscriber():
             if self.video[k] is not None:
                 cv2.imshow(k, self.video[k])
 
+        global tags
+        draw_tags(tags, self)
 
         cv2.imshow("sn3", self.canvas)
         if cv2.waitKey(1) == 27:
@@ -230,7 +248,14 @@ if __name__ == "__main__":
                 stuff.skeletons = msg["data"]
             elif msg["type"].startswith("video"):
                 stuff.video[msg["type"]] = msg["data"]
-
+            elif msg["type"] == "objects":
+                tags = msg["data"]
+            elif msg["type"] == "command":
+                pass
+            else:
+                print("Unhandled message", msg["type"])
+                print(msg)
+                sys.exit(-1)
             t = time.time()
             if t-last_draw>0.05:
                 last_draw = t

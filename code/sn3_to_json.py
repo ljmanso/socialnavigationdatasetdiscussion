@@ -349,20 +349,22 @@ class FileSubscriber():
         concatenate = [rotated]
 
         # Draw video
-        if VID:
-            f = np.zeros((720, 1280), dtype=np.uint8)
-            for k in self.video.keys():
-                if self.video[k] is not None:
-                    global mapx, mapy, roi
-                    f[:, 160:-160] = cv2.resize(self.video[k], (0,0), fx=1.5, fy=1.5)
-                    dst = cv2.remap(f, mapx, mapy, cv2.INTER_LINEAR)
-                    dst = dst[8:520, 415:1210]
-                    new_width = int(float(dst.shape[1]*rotated.shape[0])/float(dst.shape[0]))
-                    dst = cv2.resize(dst, (new_width, rotated.shape[0]), cv2.INTER_CUBIC)
-                    concatenate.append(cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR))
+        # if VID:
+            # f = np.zeros((720, 1280), dtype=np.uint8)
+            # for k in self.video.keys():
+            #     if self.video[k] is not None:
+            #         global mapx, mapy, roi
+            #         f[:, 160:-160] = cv2.resize(self.video[k], (0,0), fx=1.5, fy=1.5)
+            #         dst = cv2.remap(f, mapx, mapy, cv2.INTER_LINEAR)
+            #         dst = dst[8:520, 415:1210]
+            #         new_width = int(float(dst.shape[1]*rotated.shape[0])/float(dst.shape[0]))
+            #         dst = cv2.resize(dst, (new_width, rotated.shape[0]), cv2.INTER_CUBIC)
+            #         concatenate.append(cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR))
+        # global concatenated
+        # concatenated = np.concatenate(concatenate, axis=1)
 
-        global concatenated
-        concatenated = np.concatenate(concatenate, axis=1)
+        concatenated = self.video["video0"]
+        print(concatenated.shape)
 
         global writer
         if VID is True:
@@ -497,6 +499,6 @@ if __name__ == "__main__":
 
     for i in range(FPS*3):
         writer.write(concatenated)
-        concatenated[concatenated>2] -= 2
+        # concatenated[concatenated>2] -= 2
 
 

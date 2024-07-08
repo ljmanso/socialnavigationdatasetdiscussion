@@ -63,9 +63,10 @@ detector = Detector(searchpath=['apriltags'], families='tagStandard41h12',
 cam_prms = [fx, fy, cx, cy]
 # print(f'cam_prms {cam_prms}')
 
-TAG_SIZE=0.415
-SMALL_TAG_SIZE=0.283*5./9.
+TAG_SIZE=0.452         # MEASURED
+SMALL_TAG_SIZE=0.1588  # MEASURED
 
+tags = dict()
 
 global wfd
 wfd = None
@@ -105,8 +106,9 @@ def draw_transform(cmap, t, yaw):
     yc2 = yc + int(np.sin(yaw)*20)
     cv2.line(cmap, (xc, yc), (xc2, yc2), (0, 255, 0), 2)
 
-def process_image_get_tags(frame):
-    results = []
+def process_image_get_tags(frame, results=None):
+    if results is None:
+        results = dict()
     tags = detector.detect(frame, estimate_tag_pose=True, camera_params=cam_prms, tag_size=SMALL_TAG_SIZE)
     dst = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
     for tag in tags:
@@ -120,15 +122,18 @@ def process_image_get_tags(frame):
                 fontScale=0.8,
                 color=(0, 0, 255))
         t = tag.pose_t.ravel()
+        if tag.tag_id == 10:
+            print(10, np.linalg.norm(t))
         cam2tag = pt.transform_from(tag.pose_R, t)
         tm.remove_transform("object", "camera")
         tm.add_transform("object", "camera", cam2tag)
         zero2tag = tm.get_transform("object", "root")
         # print(zero2tag)
         rot = zero2tag[:3, :3]
+        T = zero2tag[:3, 3]
         yaw = pr.euler_from_matrix(rot, 0, 1, 2, extrinsic=True)[2]
-        draw_transform(cmap, t, yaw)
-        results.append({"id": tag.tag_id, "t": t, "yaw": yaw})
+        draw_transform(cmap, T, yaw)
+        results[tag.tag_id] = {"id": tag.tag_id, "t": T, "yaw": yaw}
 
     w2 = dst.shape[1]//2
     h2 = dst.shape[0]//2
@@ -138,6 +143,21 @@ def process_image_get_tags(frame):
     cv2.imshow('map', cmap)
     return results
 
+
+
+def draw_tags(tags, ss):
+    for tag in tags.values():
+        t = tag['t']
+        x = t[0]
+        y = t[1]
+        z = t[2]
+        yaw = tag['yaw']
+        x = int(-(x)/ss.map_mult)+MAP_COLS_HLEN+420
+        y = MAP_COLS_HLEN-int(-(y)/ss.map_mult)+120
+        x2 = x + int(25*np.cos(-yaw+ss.map_yaw+np.pi))
+        y2 = y + int(25*np.sin(-yaw+ss.map_yaw+np.pi))
+        cv2.circle(ss.canvas, (x, y), 10, (255,0,0), 2)
+        cv2.line(ss.canvas, (x, y), (x2, y2), (0,255, 0), 2)
 
 print_times={}
 
@@ -230,7 +250,7 @@ class MinimalSubscriber(Node):
         # Draw goal
         if self.goal_msg is not None:
 
-            self.waitqueue
+            # self.waitqueue
 
             position = self.goal_msg[0:3]
             quat = self.goal_msg[3:7]
@@ -266,6 +286,7 @@ class MinimalSubscriber(Node):
         else:
             timed_print("draw_no_laser", print_times, "no laser?")
 
+        draw_tags(tags, self)
 
         cv2.imshow("sn3", self.canvas)
         if cv2.waitKey(1) == 27:
@@ -405,6 +426,8 @@ def main(args=None):
 
     cameras_time = time.time()
 
+    global tags
+
     print("A")
     rclpy.init(args=args)
     print("B")
@@ -468,7 +491,7 @@ def main(args=None):
                     break
             frame = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
             frame = frame[roi[1]:roi[1]+roi[3]+1, roi[0]:roi[0]+roi[2]+1]
-            tags = process_image_get_tags(frame)
+            tags = process_image_get_tags(frame, tags)
             if minimal_subscriber.record is True:
                 # global wfd
                 pickle.dump({"type": "objects", "time": time.time(), "data": tags}, wfd)

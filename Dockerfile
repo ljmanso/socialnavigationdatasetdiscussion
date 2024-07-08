@@ -40,6 +40,9 @@ RUN pip3 install opencv-python
 RUN apt-get install -y ffmpeg git python3-pip vim libglew-dev x11-xserver-utils xvfb
 RUN apt-get install -y cmake python3-pyside2* x11vnc xvfb fluxbox
 
+RUN pip3 install dt-apriltags pytransform3d
+
+
 RUN echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc
 
 ENTRYPOINT ["/project/entrypoint.sh"]
