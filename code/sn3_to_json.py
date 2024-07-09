@@ -229,7 +229,8 @@ class FileSubscriber():
         self.angular_vel = 0.
         self.rgx = self.rgy = self.rga = 0
         self.timestamp = None
-        self.objects = objects
+        self.objects = []
+        self.initial_objects = objects
         self.walls = walls
         self.humans = []
         self.interactions = []
@@ -403,11 +404,33 @@ class FileSubscriber():
     def listener_goal(self, msg):
         self.goal_msg = [float(x) for x in msg.split(",")]
 
+
+    def move_objects_rf(self, tags):
+        ret = {}
+
+        yaw_inc = 2.6 # 2.5
+        x_inc = 1.2
+        y_inc = 3.
+        print('TAGS', tags)
+        for tag_id, tag in tags.items():
+            x = tag['t'][0]
+            y = -tag['t'][1]
+            z = tag['t'][2]
+            yaw = tag['yaw']
+            # ret[tag_id] = {"id": tag_id, "t": [x, y, z], "yaw": yaw}
+            new_yaw = yaw - yaw_inc - np.pi/2.
+            new_x = ( x*np.cos(yaw_inc) + y*np.sin(yaw_inc)) + x_inc
+            new_y = (-x*np.sin(yaw_inc) + y*np.cos(yaw_inc)) + y_inc   
+            ret[tag_id] = {"id": tag_id, "t": [new_x, new_y, z], "yaw": new_yaw}
+
+        return ret
+
     def listener_objects(self, msg):
         # We are hardcoding here the objects' types
-        processed = {}
+        processed = []
         for objid, obj in msg.items():
             new_obj = dict()
+            new_obj["id"] = objid
             new_obj['x'] = obj['t'][0]
             new_obj['y'] = obj['t'][1]
             new_obj['angle'] = obj['yaw']
@@ -417,8 +440,10 @@ class FileSubscriber():
             elif 10 <= objid < 20:
                 new_obj['type'] = "table"
                 new_obj['size'] = [0.55, 0.55]
-            processed[str(objid)] = new_obj
+            processed.append(new_obj)
         self.detected_objects = processed
+        self.objects = self.initial_objects + self.detected_objects
+
 
     def listener_map(self, msg, dont_save=False):
         self.org_map_resolution = msg.info.resolution
@@ -491,7 +516,7 @@ if __name__ == "__main__":
             elif msg["type"] == "command":
                 stuff.listener_command(msg["data"])
             elif msg["type"] == "objects":
-                stuff.listener_objects(msg["data"])
+                stuff.listener_objects(stuff.move_objects_rf(msg["data"]))
             else:
                 print("Message type not handled?", msg["type"])
                 sys.exit(1)
