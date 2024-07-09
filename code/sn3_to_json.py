@@ -349,22 +349,22 @@ class FileSubscriber():
         concatenate = [rotated]
 
         # Draw video
-        # if VID:
-            # f = np.zeros((720, 1280), dtype=np.uint8)
-            # for k in self.video.keys():
-            #     if self.video[k] is not None:
-            #         global mapx, mapy, roi
-            #         f[:, 160:-160] = cv2.resize(self.video[k], (0,0), fx=1.5, fy=1.5)
-            #         dst = cv2.remap(f, mapx, mapy, cv2.INTER_LINEAR)
-            #         dst = dst[8:520, 415:1210]
-            #         new_width = int(float(dst.shape[1]*rotated.shape[0])/float(dst.shape[0]))
-            #         dst = cv2.resize(dst, (new_width, rotated.shape[0]), cv2.INTER_CUBIC)
-            #         concatenate.append(cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR))
-        # global concatenated
-        # concatenated = np.concatenate(concatenate, axis=1)
+        if VID:
+            f = np.zeros((720, 1280), dtype=np.uint8)
+            for k in self.video.keys():
+                if self.video[k] is not None:
+                    global mapx, mapy, roi
+                    f[:, 160:-160] = cv2.resize(self.video[k], (0,0), fx=1.5, fy=1.5)
+                    dst = cv2.remap(f, mapx, mapy, cv2.INTER_LINEAR)
+                    dst = dst[8:520, 415:1210]
+                    new_width = int(float(dst.shape[1]*rotated.shape[0])/float(dst.shape[0]))
+                    dst = cv2.resize(dst, (new_width, rotated.shape[0]), cv2.INTER_CUBIC)
+                    concatenate.append(cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR))
+        global concatenated
+        concatenated = np.concatenate(concatenate, axis=1)
 
-        concatenated = self.video["video0"]
-        print(concatenated.shape)
+        # concatenated = self.video["video0"]
+        # print(concatenated.shape)
 
         global writer
         if VID is True:
@@ -403,6 +403,22 @@ class FileSubscriber():
     def listener_goal(self, msg):
         self.goal_msg = [float(x) for x in msg.split(",")]
 
+    def listener_objects(self, msg):
+        # We are hardcoding here the objects' types
+        processed = {}
+        for objid, obj in msg.items():
+            new_obj = dict()
+            new_obj['x'] = obj['t'][0]
+            new_obj['y'] = obj['t'][1]
+            new_obj['angle'] = obj['yaw']
+            if 0 < objid < 10:
+                new_obj['type'] = "chair"
+                new_obj['size'] = [0.35, 0.35]
+            elif 10 <= objid < 20:
+                new_obj['type'] = "table"
+                new_obj['size'] = [0.55, 0.55]
+            processed[str(objid)] = new_obj
+        self.objects = processed
 
     def listener_map(self, msg, dont_save=False):
         self.org_map_resolution = msg.info.resolution
@@ -474,6 +490,8 @@ if __name__ == "__main__":
                 stuff.video[msg["type"]] = msg["data"]
             elif msg["type"] == "command":
                 stuff.listener_command(msg["data"])
+            elif msg["type"] == "objects":
+                stuff.listener_objects(msg["data"])
             else:
                 print("Message type not handled?", msg["type"])
                 sys.exit(1)

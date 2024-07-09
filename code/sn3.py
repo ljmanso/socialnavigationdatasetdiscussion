@@ -39,7 +39,7 @@ from pytransform3d.transform_manager import TransformManager
 from pytransform3d.plot_utils import remove_frame
 import matplotlib.pyplot as plt
 
-cmap = np.zeros((800, 800, 3), dtype=np.uint8)
+# cmap = np.zeros((800, 800, 3), dtype=np.uint8)
 
 try:
     with open('calibration.pickle', 'rb') as handle:
@@ -111,17 +111,17 @@ def process_image_get_tags(frame, results=None):
     if results is None:
         results = dict()
     tags = detector.detect(frame, estimate_tag_pose=True, camera_params=cam_prms, tag_size=SMALL_TAG_SIZE)
-    dst = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    # dst = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
     for tag in tags:
         if tag.tag_id == 0:
             continue
-        for idx in range(len(tag.corners)):
-            cv2.line(dst, tuple(tag.corners[idx-1, :].astype(int)), tuple(tag.corners[idx, :].astype(int)), (0, 255, 0))
-            cv2.putText(dst, str(tag.tag_id),
-                org=(tag.corners[0, 0].astype(int)+10,tag.corners[0, 1].astype(int)+10),
-                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                fontScale=0.8,
-                color=(0, 0, 255))
+        # for idx in range(len(tag.corners)):
+            # cv2.line(dst, tuple(tag.corners[idx-1, :].astype(int)), tuple(tag.corners[idx, :].astype(int)), (0, 255, 0))
+            # cv2.putText(dst, str(tag.tag_id),
+            #     org=(tag.corners[0, 0].astype(int)+10,tag.corners[0, 1].astype(int)+10),
+            #     fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+            #     fontScale=0.8,
+            #     color=(0, 0, 255))
         t = tag.pose_t.ravel()
         if tag.tag_id == 10:
             print(10, np.linalg.norm(t))
@@ -133,15 +133,15 @@ def process_image_get_tags(frame, results=None):
         rot = zero2tag[:3, :3]
         T = zero2tag[:3, 3]
         yaw = pr.euler_from_matrix(rot, 0, 1, 2, extrinsic=True)[2]
-        draw_transform(cmap, T, yaw)
+        # draw_transform(cmap, T, yaw)
         results[tag.tag_id] = {"id": tag.tag_id, "t": T, "yaw": yaw}
 
-    w2 = dst.shape[1]//2
-    h2 = dst.shape[0]//2
-    dst[h2, :, 2] = 255
-    dst[:, w2, 2] = 255
-    cv2.imshow('frame2', dst)
-    cv2.imshow('map', cmap)
+    # w2 = dst.shape[1]//2
+    # h2 = dst.shape[0]//2
+    # dst[h2, :, 2] = 255
+    # dst[:, w2, 2] = 255
+    # cv2.imshow('frame2', dst)
+    # cv2.imshow('map', cmap)
     return results
 
 
@@ -481,9 +481,9 @@ def main(args=None):
             minimal_subscriber.draw_things()
 
         if t-cameras_time > 0.15:
-            cmap[:,:,:] = 120
-            cmap[400:401, :, 2] = 255
-            cmap[:, 400:401, 2] = 255
+            # cmap[:,:,:] = 120
+            # cmap[400:401, :, 2] = 255
+            # cmap[:, 400:401, 2] = 255
             cameras_time = t
             image_ok, frame = vid.read() 
             if image_ok is True:
@@ -494,13 +494,15 @@ def main(args=None):
             frame = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
             frame = frame[roi[1]:roi[1]+roi[3]+1, roi[0]:roi[0]+roi[2]+1]
             tags = process_image_get_tags(frame, tags)
+            miniframe = cv2.resize(frame, None, fx=0.25, fy=0.25, interpolation= cv2.INTER_NEAREST)
+
             if minimal_subscriber.record is True:
                 # global wfd
                 pickle.dump({"type": "objects", "time": time.time(), "data": tags}, wfd)
-                pickle.dump({"type": "video0",  "time": time.time(), "data": frame}, wfd)
+                pickle.dump({"type": "video0",  "time": time.time(), "data": miniframe}, wfd)
             else:
                 minimal_subscriber.waitqueue.append({"type": "objects", "time": time.time(), "data": tags})
-                minimal_subscriber.waitqueue.append({"type": "video0", "time": time.time(), "data": frame})
+                minimal_subscriber.waitqueue.append({"type": "video0", "time": time.time(), "data": miniframe})
 
 
 
