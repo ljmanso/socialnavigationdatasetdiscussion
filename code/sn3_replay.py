@@ -35,11 +35,30 @@ def delay_until(msg):
 
     inc_file = msg["time"] - t0file
     inc_real = (time.time() - t0real)
-    error = inc_file - inc_real
+    error = inc_file - inc_real*0.6
 
     if error > 0:
         time.sleep(error)
 
+def move_objects_rf(tags):
+    ret = {}
+
+    yaw_inc = 2.6 # 2.5
+    x_inc = 1.2
+    y_inc = 3.
+    print('TAGS', tags)
+    for tag_id, tag in tags.items():
+        x = tag['t'][0]
+        y = -tag['t'][1]
+        z = tag['t'][2]
+        yaw = tag['yaw']
+        ret[tag_id] = {"id": tag_id, "t": [x, y, z], "yaw": yaw}
+        new_yaw = yaw - yaw_inc - np.pi/2.
+        new_x = ( x*np.cos(yaw_inc) + y*np.sin(yaw_inc)) + x_inc
+        new_y = (-x*np.sin(yaw_inc) + y*np.cos(yaw_inc)) + y_inc   
+        ret[tag_id+100] = {"id": tag_id+100, "t": [new_x, new_y, z], "yaw": new_yaw}
+
+    return ret
 
 def print_msg(msg):
     print("{", end="")
@@ -56,7 +75,6 @@ def draw_tags(tags, ss):
         t = tag['t']
         x = t[0]
         y = t[1]
-        z = t[2]
         yaw = tag['yaw']
         x = int(-(x)/ss.map_mult)+MAP_COLS_HLEN+420
         y = MAP_COLS_HLEN-int(-(y)/ss.map_mult)+120
@@ -64,6 +82,11 @@ def draw_tags(tags, ss):
         y2 = y + int(25*np.sin(-yaw+ss.map_yaw+np.pi))
         cv2.circle(ss.canvas, (x, y), 10, (255,0,0), 2)
         cv2.line(ss.canvas, (x, y), (x2, y2), (0,255, 0), 2)
+        cv2.putText(ss.canvas, str(tag["id"]),
+            org=(x, y),
+            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale=0.8,
+            color=(0, 0, 255))
 
 class FileSubscriber():
     def __init__(self):
@@ -171,8 +194,12 @@ class FileSubscriber():
         draw_tags(tags, self)
 
         cv2.imshow("sn3", self.canvas)
-        if cv2.waitKey(1) == 27:
+        k = cv2.waitKey(1)
+        if k == 27:
             sys.exit(0)
+        elif k == 112:
+            global pause
+            pause = not pause
 
 
     def listener_pose(self, msg):
@@ -221,49 +248,51 @@ class FileSubscriber():
 if __name__ == "__main__":
     # global t0file
     # global t0real
-
+    pause = False
     last_draw = time.time()
 
     stuff = FileSubscriber()
 
     wfd = open(sys.argv[1], "rb")
+
     while True:
-        try:
-            msg = pickle.load(wfd)
-            if type(msg) != type({}):
-                print("??", msg)
-                continue
-            # print("--------------------------------")
-            # print_msg(msg)
-            delay_until(msg)
-            if msg["type"] == "map":
-                stuff.listener_map(msg["data"])
-            elif msg["type"] == "goal":
-                stuff.listener_goal(msg["data"])
-            elif msg["type"] == "pose":
-                stuff.listener_pose(msg["data"])
-            elif msg["type"] == "laser":
-                stuff.listener_laser(msg["data"])
-            elif msg["type"] == "humans":
-                stuff.skeletons = msg["data"]
-            elif msg["type"].startswith("video"):
-                stuff.video[msg["type"]] = msg["data"]
-            elif msg["type"] == "objects":
-                tags = msg["data"]
-            elif msg["type"] == "command":
-                pass
-            else:
-                print("Unhandled message", msg["type"])
-                print(msg)
-                sys.exit(-1)
-            t = time.time()
+        if pause is not True:
+            try:
+                msg = pickle.load(wfd)
+                if type(msg) != type({}):
+                    print("??", msg)
+                    continue
+                # print("--------------------------------")
+                # print_msg(msg)
+                delay_until(msg)
+                if msg["type"] == "map":
+                    stuff.listener_map(msg["data"])
+                elif msg["type"] == "goal":
+                    stuff.listener_goal(msg["data"])
+                elif msg["type"] == "pose":
+                    stuff.listener_pose(msg["data"])
+                elif msg["type"] == "laser":
+                    stuff.listener_laser(msg["data"])
+                elif msg["type"] == "humans":
+                    stuff.skeletons = msg["data"]
+                elif msg["type"].startswith("video"):
+                    stuff.video[msg["type"]] = msg["data"]
+                elif msg["type"] == "objects":
+                    tags = move_objects_rf(msg["data"])
+                elif msg["type"] == "command":
+                    pass
+                else:
+                    print("Unhandled message", msg["type"])
+                    print(msg)
+                    sys.exit(-1)
+                t = time.time()
+            except EOFError:
+                print('EOF')
+                break
+
             if t-last_draw>0.05:
                 last_draw = t
                 stuff.draw_things()
-
-        except EOFError:
-            print('EOF')
-            break
 
     wfd.close()
 

@@ -1,5 +1,6 @@
 import sys
 import time
+import datetime
 import itertools
 from collections import namedtuple, deque
 
@@ -354,7 +355,8 @@ class MinimalSubscriber(Node):
                 if wfd is not None:
                     print("CLOSE2")
                     wfd.close()
-                self.fname = f"{str(int((time.time())))}_dat.pickle"
+                time_time = datetime.datetime.fromtimestamp(int(time.time())).isoformat()
+                self.fname = f"{time_time}_dat.pickle"
                 wfd = open(self.fname, "wb")
                 self.force_first_message_map = {"type": "map", "time": time.time(), "data": msg2dict(self.map_msg)}
                 print("OPEN", self.fname, wfd)
@@ -497,6 +499,7 @@ def main(args=None):
                 pickle.dump({"type": "objects", "time": time.time(), "data": tags}, wfd)
                 pickle.dump({"type": "video0",  "time": time.time(), "data": frame}, wfd)
             else:
+                minimal_subscriber.waitqueue.append({"type": "objects", "time": time.time(), "data": tags})
                 minimal_subscriber.waitqueue.append({"type": "video0", "time": time.time(), "data": frame})
 
 
