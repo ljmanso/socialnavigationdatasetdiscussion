@@ -418,7 +418,7 @@ class FileSubscriber():
                 new_obj['type'] = "table"
                 new_obj['size'] = [0.55, 0.55]
             processed[str(objid)] = new_obj
-        self.objects = processed
+        self.detected_objects = processed
 
     def listener_map(self, msg, dont_save=False):
         self.org_map_resolution = msg.info.resolution

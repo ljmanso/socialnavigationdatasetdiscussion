@@ -35,7 +35,7 @@ def delay_until(msg):
 
     inc_file = msg["time"] - t0file
     inc_real = (time.time() - t0real)
-    error = inc_file - inc_real*0.6
+    error = inc_file - inc_real
 
     if error > 0:
         time.sleep(error)
@@ -52,11 +52,11 @@ def move_objects_rf(tags):
         y = -tag['t'][1]
         z = tag['t'][2]
         yaw = tag['yaw']
-        ret[tag_id] = {"id": tag_id, "t": [x, y, z], "yaw": yaw}
+        # ret[tag_id] = {"id": tag_id, "t": [x, y, z], "yaw": yaw}
         new_yaw = yaw - yaw_inc - np.pi/2.
         new_x = ( x*np.cos(yaw_inc) + y*np.sin(yaw_inc)) + x_inc
         new_y = (-x*np.sin(yaw_inc) + y*np.cos(yaw_inc)) + y_inc   
-        ret[tag_id+100] = {"id": tag_id+100, "t": [new_x, new_y, z], "yaw": new_yaw}
+        ret[tag_id] = {"id": tag_id, "t": [new_x, new_y, z], "yaw": new_yaw}
 
     return ret
 
