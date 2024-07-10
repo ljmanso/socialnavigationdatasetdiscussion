@@ -1,12 +1,16 @@
 import sys
 import time
+import pickle
 import datetime
 import itertools
+
 from collections import namedtuple, deque
+from threading import Thread, RLock
 
 import numpy as np
-
+import  Ice
 import cv2
+
 
 import rclpy
 from rclpy.node import Node
@@ -16,58 +20,33 @@ from geometry_msgs.msg import Pose
 from nav_msgs.msg import OccupancyGrid
 from sensor_msgs.msg import LaserScan
 
+from image_thread import image_thread
+
 vid = cv2.VideoCapture("/dev/video6")
 if vid is None:
     print("Cannot open camera")
     sys.exit(-1)
-print(vid)
-
 vid.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 vid.set(cv2.CAP_PROP_FRAME_HEIGHT, 1024)
 
+image_thread_data = {
+    'lock': RLock(),
+    'tags': dict(),
+    'newdata': False,
+    'stop': False
 
+}
+tags = {}
+cv_thread = Thread(target=image_thread, args=[vid, image_thread_data])
+cv_thread.start()
 
-import pickle
-
-import sys, Ice
 import pose3DI
 
-from dt_apriltags import *
-from pytransform3d import rotations as pr
-from pytransform3d import transformations as pt
-from pytransform3d.transform_manager import TransformManager
-from pytransform3d.plot_utils import remove_frame
-import matplotlib.pyplot as plt
+# from pytransform3d import rotations as pr
+# from pytransform3d import transformations as pt
+# from pytransform3d.transform_manager import TransformManager
+# from pytransform3d.plot_utils import remove_frame
 
-# cmap = np.zeros((800, 800, 3), dtype=np.uint8)
-
-try:
-    with open('calibration.pickle', 'rb') as handle:
-        ret, mtx, dist, rvecs, tvecs, h, w, mtx, dist, rvecs, tvecs = pickle.load(handle)
-except:
-    print("Can't get calibration file")
-    sys.exit(-1)
-
-print(f"{w=} {h=}")
-newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w,h), 0, (w,h))
-fx = newcameramtx[0,0]
-fy = newcameramtx[1,1]
-cx = newcameramtx[0,2]
-cy = newcameramtx[1,2]
-print(newcameramtx)
-mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5)
-
-
-detector = Detector(searchpath=['apriltags'], families='tagStandard41h12',
-                nthreads=5, quad_decimate=1.0, quad_sigma=0.1, refine_edges=1,
-                decode_sharpening=0.25, debug=0)
-cam_prms = [fx, fy, cx, cy]
-# print(f'cam_prms {cam_prms}')
-
-TAG_SIZE=0.452         # MEASURED
-SMALL_TAG_SIZE=0.1588  # MEASURED
-
-tags = dict()
 
 global wfd
 wfd = None
@@ -89,14 +68,6 @@ if not pose:
 else:
     print('valid proxy')
 
-transformFR = pickle.load(open("objectZ.pkl", "rb"))
-print("transformFR")
-print("transformFR")
-print("transformFR")
-print(transformFR)
-tm = TransformManager()
-# tm.add_transform("camera", "root", transformFR)
-tm.add_transform("root", "camera", transformFR)
 
 
 def draw_transform(cmap, t, yaw):
@@ -106,43 +77,6 @@ def draw_transform(cmap, t, yaw):
     xc2 = xc + int(np.cos(yaw)*20)
     yc2 = yc + int(np.sin(yaw)*20)
     cv2.line(cmap, (xc, yc), (xc2, yc2), (0, 255, 0), 2)
-
-def process_image_get_tags(frame, results=None):
-    if results is None:
-        results = dict()
-    tags = detector.detect(frame, estimate_tag_pose=True, camera_params=cam_prms, tag_size=SMALL_TAG_SIZE)
-    # dst = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-    for tag in tags:
-        if tag.tag_id == 0:
-            continue
-        # for idx in range(len(tag.corners)):
-            # cv2.line(dst, tuple(tag.corners[idx-1, :].astype(int)), tuple(tag.corners[idx, :].astype(int)), (0, 255, 0))
-            # cv2.putText(dst, str(tag.tag_id),
-            #     org=(tag.corners[0, 0].astype(int)+10,tag.corners[0, 1].astype(int)+10),
-            #     fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-            #     fontScale=0.8,
-            #     color=(0, 0, 255))
-        t = tag.pose_t.ravel()
-        if tag.tag_id == 10:
-            print(10, np.linalg.norm(t))
-        cam2tag = pt.transform_from(tag.pose_R, t)
-        tm.remove_transform("object", "camera")
-        tm.add_transform("object", "camera", cam2tag)
-        zero2tag = tm.get_transform("object", "root")
-        # print(zero2tag)
-        rot = zero2tag[:3, :3]
-        T = zero2tag[:3, 3]
-        yaw = pr.euler_from_matrix(rot, 0, 1, 2, extrinsic=True)[2]
-        # draw_transform(cmap, T, yaw)
-        results[tag.tag_id] = {"id": tag.tag_id, "t": T, "yaw": yaw}
-
-    # w2 = dst.shape[1]//2
-    # h2 = dst.shape[0]//2
-    # dst[h2, :, 2] = 255
-    # dst[:, w2, 2] = 255
-    # cv2.imshow('frame2', dst)
-    # cv2.imshow('map', cmap)
-    return results
 
 
 
@@ -173,7 +107,7 @@ class MinimalSubscriber(Node):
         self.subscription_map = self.create_subscription(OccupancyGrid, "/robot/map", self.listener_map, 10)
         self.subscription_goal = self.create_subscription(String, "/robot/goal", self.listener_goal, 10)
         self.subscription_cmd = self.create_subscription(String, "/robot/velocity_command", self.listener_cmd, 10)
-        self.subscription_laser = self.create_subscription(LaserScan, "/robot/laser_data", self.listener_laser, 10)
+        # self.subscription_laser = self.create_subscription(LaserScan, "/robot/laser_data", self.listener_laser, 10)
 
         self.org_map_resolution = None
         self.org_map_width = None
@@ -270,27 +204,30 @@ class MinimalSubscriber(Node):
             cv2.circle(self.canvas, (gx, gy), 10, color, 2)
             cv2.line(self.canvas, (gx, gy), (x2, y2), (0,0,0), 2)
 
-        # Draw laser
-        if self.laser_msg is not None and self.robot_yaw is not None:
-            angle = self.laser_msg.angle_min - self.robot_yaw
-            subsample = 1
-            for r in itertools.islice(self.laser_msg.ranges, None, None, subsample):
-                if np.isinf(r) is True:
-                    r = 0
-                #convert angle and radius to cartesian coordinates
-                lx = r*np.cos(-angle) + self.robot_x
-                ly = r*np.sin(- angle) + self.robot_y
-                lx = int(-(lx)/self.map_mult)+MAP_COLS_HLEN+420
-                ly = MAP_COLS_HLEN-int(-(ly)/self.map_mult)+120
-                angle = angle + self.laser_msg.angle_increment
-                cv2.circle(self.canvas, (lx, ly), 2, (0.7, 0.7, 0))
-        else:
-            timed_print("draw_no_laser", print_times, "no laser?")
+        # # Draw laser
+        # if self.laser_msg is not None and self.robot_yaw is not None:
+        #     angle = self.laser_msg.angle_min - self.robot_yaw
+        #     subsample = 1
+        #     for r in itertools.islice(self.laser_msg.ranges, None, None, subsample):
+        #         if np.isinf(r) is True:
+        #             r = 0
+        #         #convert angle and radius to cartesian coordinates
+        #         lx = r*np.cos(-angle) + self.robot_x
+        #         ly = r*np.sin(- angle) + self.robot_y
+        #         lx = int(-(lx)/self.map_mult)+MAP_COLS_HLEN+420
+        #         ly = MAP_COLS_HLEN-int(-(ly)/self.map_mult)+120
+        #         angle = angle + self.laser_msg.angle_increment
+        #         cv2.circle(self.canvas, (lx, ly), 2, (0.7, 0.7, 0))
+        # else:
+        #     timed_print("draw_no_laser", print_times, "no laser?")
 
         draw_tags(tags, self)
 
         cv2.imshow("sn3", self.canvas)
         if cv2.waitKey(1) == 27:
+            image_thread_data['lock'].acquire()
+            image_thread_data['stop'] = True
+            image_thread_data['lock'].release()
             sys.exit(0)
 
         if not self.record:
@@ -421,26 +358,22 @@ class MinimalSubscriber(Node):
         self.map_mult = self.org_map_resolution/ORG_MAP_SCALE
 
         self.map_msg = msg
+        print("=================== M A P ====================")
+        if dont_save is False:
+            self.destroy_subscription(self.subscription_map)
 
 def main(args=None):
     check_time = time.time()
     draw_time = time.time()
 
-    cameras_time = time.time()
-
     global tags
 
-    print("A")
     rclpy.init(args=args)
-    print("B")
     minimal_subscriber = MinimalSubscriber()
-    print("C")
-     # rclpy.spin(minimal_subscriber)
  
     while True:
-        t = time.time()
-
         rclpy.spin_once(minimal_subscriber)
+        t = time.time()
         if t-check_time > 0.05:
             check_time = t
             skeletons = []
@@ -468,41 +401,29 @@ def main(args=None):
                 pickle.dump({"type": "humans", "time": time.time(), "data": minimal_subscriber.skeletons}, wfd)
             else:
                 minimal_subscriber.waitqueue.append({"type": "humans", "time": time.time(), "data": minimal_subscriber.skeletons})
-            # try:
-            #     for idx, skeleton in enumerate(minimal_subscriber.skeletons):
-            #         print(f"{idx=}, {len(skeleton)=}, {skeleton=}")
-            # except:
-            #     print('-------------------------------')
-            #     print(f"{skeletons=}")
-            #     print('-------------------------------')
 
         if t-draw_time > 0.05:
             draw_time = t
             minimal_subscriber.draw_things()
 
-        if t-cameras_time > 0.15:
-            # cmap[:,:,:] = 120
-            # cmap[400:401, :, 2] = 255
-            # cmap[:, 400:401, 2] = 255
-            cameras_time = t
-            image_ok, frame = vid.read() 
-            if image_ok is True:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
-                cv2.imshow('frame', frame) 
-                if cv2.waitKey(1) == 27:
-                    break
-            frame = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
-            frame = frame[roi[1]:roi[1]+roi[3]+1, roi[0]:roi[0]+roi[2]+1]
-            tags = process_image_get_tags(frame, tags)
-            miniframe = cv2.resize(frame, None, fx=0.25, fy=0.25, interpolation= cv2.INTER_NEAREST)
-
+        image_thread_data['lock'].acquire()
+        
+        if image_thread_data['newdata'] is True:
+            image_thread_data['newdata'] = False
+            tags = image_thread_data['tags']
+            frame = image_thread_data['frame']
+            image_thread_data['lock'].release()
+            cv2.imshow('frame', frame) 
             if minimal_subscriber.record is True:
-                # global wfd
                 pickle.dump({"type": "objects", "time": time.time(), "data": tags}, wfd)
-                pickle.dump({"type": "video0",  "time": time.time(), "data": miniframe}, wfd)
+                pickle.dump({"type": "video0",  "time": time.time(), "data": frame}, wfd)
             else:
                 minimal_subscriber.waitqueue.append({"type": "objects", "time": time.time(), "data": tags})
-                minimal_subscriber.waitqueue.append({"type": "video0", "time": time.time(), "data": miniframe})
+                minimal_subscriber.waitqueue.append({"type": "video0", "time": time.time(), "data": frame})
+        else:
+            image_thread_data['lock'].release()
+            
+
 
 
 
