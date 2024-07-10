@@ -235,6 +235,9 @@ class FileSubscriber():
         self.humans = []
         self.interactions = []
 
+        self.humans_ids = {}
+        self.next_human_id = 0
+
 
         self.video = {}
 
@@ -324,6 +327,18 @@ class FileSubscriber():
                     y2 = cy + int(25*np.sin(-hangle+self.map_yaw+np.pi))
                     cv2.circle(self.canvas, (cx, cy), HUMAN_WIDTH, (0,0,0), 2)
                     cv2.line(self.canvas, (cx, cy), (x2, y2), (0,0,255), 2)
+
+                hx = self.humans[skeleton_idx]["x"]
+                hy = self.humans[skeleton_idx]["y"]
+
+                cx = int(-(hx)/self.map_mult)+MAP_COLS_HLEN+XOFFSET
+                cy = MAP_COLS_HLEN-int(-(hy)/self.map_mult)+YOFFSET
+
+                cv2.putText(self.canvas, str(self.humans[skeleton_idx]["id"]),
+                org=(cx, cy),
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=0.8,
+                color=(0, 0, 255))
 
 
         # Draw goal
@@ -475,13 +490,44 @@ class FileSubscriber():
         self.map_msg = msg
         data_structure["grid"] = json_struct_from_map(self, msg)
 
+    def get_id_for_human(self, pose, max_human_distance=1.0):
+        h_id = -1
+        min_dist = np.inf
+        pc = np.array([pose[0], pose[1]])
+        for id, id_info in self.humans_ids.items():
+            lpose = id_info["pos"]
+            pp = np.array([lpose[0], lpose[1]])
+            dist = np.linalg.norm(pp-pc)
+            if dist < min_dist:
+                min_dist = dist
+                h_id = id
+        if h_id < 0 or min_dist>max_human_distance:
+            h_id = self.next_human_id
+            self.next_human_id += 1
+        return h_id            
+            
+    def update_humans_ids(self, max_time_without_update = 3):
+        for h in self.humans:
+            id = h["id"]
+            p = [h["x"], h["y"], h["angle"]]
+            self.humans_ids[id] = {"pos": p, "timestamp": self.timestamp}
+
+        ids = self.humans_ids.keys()
+        for i in list(ids):
+            if self.timestamp - self.humans_ids[i]["timestamp"] > max_time_without_update:
+                del self.humans_ids[i]
+
+
+
     def listener_skeletons(self, data):
         self.skeletons = data
         self.humans = []
         for id, s in enumerate(self.skeletons):
             pose = get_human_pose(s)
-            self.humans.append({"id":id, "x":pose[0], "y":pose[1], "angle":pose[2], "speed":0})
+            h_id = self.get_id_for_human(pose)
+            self.humans.append({"id":h_id, "x":pose[0], "y":pose[1], "angle":pose[2], "speed":0})
         # self.humans = [ get_human_pose(x) for x in self.skeletons ]
+        self.update_humans_ids()
 
 if __name__ == "__main__":
     last_draw = None
