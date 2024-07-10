@@ -230,14 +230,19 @@ class FileSubscriber():
         self.rgx = self.rgy = self.rga = 0
         self.timestamp = None
         self.objects = []
-        self.initial_objects = objects
         self.walls = walls
         self.humans = []
         self.interactions = []
 
         self.humans_ids = {}
-        self.next_human_id = 0
+        self.next_id = 0
 
+        self.detected_objects_ids = {}
+        for i in range(len(objects)):
+            objects[i]["id"] = self.next_id
+            self.next_id += 1
+
+        self.initial_objects = objects
 
         self.video = {}
 
@@ -445,7 +450,12 @@ class FileSubscriber():
         processed = []
         for objid, obj in msg.items():
             new_obj = dict()
-            new_obj["id"] = objid
+            if objid in self.detected_objects_ids.keys():
+                new_obj["id"] = self.detected_objects_ids[objid]
+            else:
+                new_obj["id"] = self.next_id
+                self.detected_objects_ids[objid] = self.next_id
+                self.next_id += 1
             new_obj['x'] = obj['t'][0]
             new_obj['y'] = obj['t'][1]
             new_obj['angle'] = obj['yaw']
@@ -502,8 +512,8 @@ class FileSubscriber():
                 min_dist = dist
                 h_id = id
         if h_id < 0 or min_dist>max_human_distance:
-            h_id = self.next_human_id
-            self.next_human_id += 1
+            h_id = self.next_id
+            self.next_id += 1
         return h_id            
             
     def update_humans_ids(self, max_time_without_update = 3):
