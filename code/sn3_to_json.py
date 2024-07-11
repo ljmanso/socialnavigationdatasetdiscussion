@@ -535,7 +535,7 @@ class FileSubscriber():
         for id, s in enumerate(self.skeletons):
             pose = get_human_pose(s)
             h_id = self.get_id_for_human(pose)
-            self.humans.append({"id":h_id, "x":pose[0], "y":pose[1], "angle":pose[2], "speed":0})
+            self.humans.append({"id":h_id, "x":pose[0], "y":pose[1], "angle":pose[2]})
         # self.humans = [ get_human_pose(x) for x in self.skeletons ]
         self.update_humans_ids()
 
