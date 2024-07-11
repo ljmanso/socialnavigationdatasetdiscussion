@@ -539,6 +539,40 @@ class FileSubscriber():
         # self.humans = [ get_human_pose(x) for x in self.skeletons ]
         self.update_humans_ids()
 
+
+
+class CustomEncoder(json.JSONEncoder):
+    def encode(self, obj):
+        json_str = super().encode(obj)
+        return json_str
+    
+    def iterencode(self, obj, _one_shot=False):
+        for chunk in super().iterencode(obj, _one_shot=_one_shot):
+            if isinstance(obj, list) and len(obj) > 5:
+                chunk = json.dumps(obj)
+            yield chunk
+
+def process_lists(data):
+    if isinstance(data, dict):
+        return {k: process_lists(v) for k, v in data.items()}
+    
+
+    elif isinstance(data, list):
+        if len(data) > 25:
+            if not isinstance(data[0], dict):
+                return json.dumps(data)
+        return [process_lists(i) for i in data]
+
+    return data
+
+def dump_custom(data, json_fd, indent=None):
+    processed_data = process_lists(data)
+    json_string = json.dumps(processed_data, indent=indent, cls=CustomEncoder)
+    # Remove the extra quotes around the long lists
+    json_string = json_string.replace('\\"', '"')
+    json_string = json_string.replace(']"', ']').replace('"[', '[')
+    json_fd.write(json_string)
+
 if __name__ == "__main__":
     last_draw = None
 
@@ -593,7 +627,8 @@ if __name__ == "__main__":
 
     json_fd = open(sys.argv[1].replace(".pickle", ".json"), "w")
     # print(data_structure)
-    json.dump(data_structure, json_fd, indent=4)
+    # json.dump(data_structure, json_fd, indent=4)
+    dump_custom(data_structure, json_fd, indent=4)
     wfd.close()
 
     for i in range(FPS*3):
