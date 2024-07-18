@@ -238,6 +238,7 @@ class FileSubscriber():
         self.next_id = 0
 
         self.detected_objects_ids = {}
+        self.detected_objects_mean_pose = {}
         for i in range(len(objects)):
             objects[i]["id"] = self.next_id
             self.next_id += 1
@@ -465,6 +466,13 @@ class FileSubscriber():
             elif 10 <= objid < 20:
                 new_obj['type'] = "table"
                 new_obj['size'] = [0.55, 0.55]
+            # Update pose dictionary for smoothing noise poses in objects
+            if new_obj["id"] not in self.detected_objects_mean_pose.keys():
+                self.detected_objects_mean_pose[new_obj["id"]] = {'x':[], 'y':[], 'angle': []}
+            self.detected_objects_mean_pose[new_obj["id"]]['x'].append(new_obj['x'])
+            self.detected_objects_mean_pose[new_obj["id"]]['y'].append(new_obj['y'])
+            self.detected_objects_mean_pose[new_obj["id"]]['angle'].append(new_obj['angle'])
+
             processed.append(new_obj)
         self.detected_objects = processed
         self.objects = self.initial_objects + self.detected_objects
@@ -538,6 +546,20 @@ class FileSubscriber():
             self.humans.append({"id":h_id, "x":pose[0], "y":pose[1], "angle":pose[2]})
         # self.humans = [ get_human_pose(x) for x in self.skeletons ]
         self.update_humans_ids()
+
+    def postprocess_detected_objects(self):
+        mean_poses = {}
+        for id, poses in self.detected_objects_mean_pose.items():
+            mean_x = np.mean(poses['x'])
+            mean_y = np.mean(poses['y'])
+            mean_angle = np.mean(poses['angle'])
+            mean_poses[id] = {'x':mean_x, 'y':mean_y, 'angle':mean_angle}
+        for d in data_structure['sequence']:
+            for o in d["objects"]:
+                if o['id'] in mean_poses.keys():
+                    o['x'] = mean_poses[o['id']]['x']
+                    o['y'] = mean_poses[o['id']]['y']
+                    o['angle'] = mean_poses[o['id']]['angle']
 
 
 
@@ -625,6 +647,7 @@ if __name__ == "__main__":
             stuff.draw_things()
             stuff.add_to_json_structure()
 
+    stuff.postprocess_detected_objects()
     json_fd = open(sys.argv[1].replace(".pickle", ".json"), "w")
     # print(data_structure)
     # json.dump(data_structure, json_fd, indent=4)
