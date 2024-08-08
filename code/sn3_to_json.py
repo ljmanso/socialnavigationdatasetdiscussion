@@ -19,9 +19,8 @@ except:
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w,h), 0.5, (w,h))
 mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5)
 
-DESC = sys.argv[2]
 VID = "video" in sys.argv
-
+VID = False
 
 XOFFSET = 435
 YOFFSET = 125
@@ -29,15 +28,15 @@ YOFFSET = 125
 DRAW_JOINTS = False
 DRAW_CIRCLE = False
 DRAW_SQUARE = False
-if DESC == "joints":
-    DRAW_JOINTS = True
-elif DESC == "circles":
-    DRAW_CIRCLE = True
-elif DESC == "polygons":
-    DRAW_SQUARE = True
-else:
-    DRAW_SQUARE = True
-
+if len(sys.argv) >= 3:
+    DESC = sys.argv[2]
+    if DESC == "joints":
+        DRAW_JOINTS = True
+    elif DESC == "circles":
+        DRAW_CIRCLE = True
+    elif DESC == "polygons":
+        DRAW_SQUARE = True
+NOX = (DRAW_JOINTS or DRAW_CIRCLE or DRAW_SQUARE) is False
 
 ROBOT_WIDTH = 20
 HUMAN_WIDTH = 23
@@ -164,7 +163,7 @@ def draw_wall(w, canvas, map_mult, color=None):
     cv2.line(canvas, (pt1x, pt1y), (pt2x, pt2y), c, thickness=4)
 
 def json_struct_from_map(main, map):
-    print(map)
+    # print(map)
     WMAP = 350
     HMAP = 350
     OMAPY = int(-map.info.origin.position.y / map.info.resolution -HMAP/2) 
@@ -238,6 +237,7 @@ class FileSubscriber():
         self.next_id = 0
 
         self.detected_objects_ids = {}
+        self.detected_objects_mean_pose = {}
         for i in range(len(objects)):
             objects[i]["id"] = self.next_id
             self.next_id += 1
@@ -272,6 +272,25 @@ class FileSubscriber():
         }
         data_structure["sequence"].append(ret)
 
+    def update_robot_and_goal_pose(self):
+        if self.goal_msg is not None:
+            position = self.goal_msg[0:3]
+            quat = self.goal_msg[3:7]
+            status = self.goal_msg[-1]
+            self.rgx = position[0]
+            self.rgy = position[1]
+            if status < 3:
+                color = tuple((0,1,0))
+            else:
+                color = tuple((0,0.35,0.65))
+            self.rga = euler_from_tuple(quat)[2]
+
+        if self.pose_msg is not None:
+            position = self.pose_msg.position
+            self.robot_x = position.x
+            self.robot_y = position.y
+            self.robot_yaw = euler_from_quaternion(self.pose_msg.orientation)[2]
+
     def draw_things(self):
         # Draw map
         self.canvas[:, :, :] = self.canvas_stored[:, :, :]
@@ -286,10 +305,6 @@ class FileSubscriber():
 
         # Draw pose
         if self.pose_msg is not None:
-            position = self.pose_msg.position
-            self.robot_x = position.x
-            self.robot_y = position.y
-            self.robot_yaw = euler_from_quaternion(self.pose_msg.orientation)[2]
             rx = int(-(self.robot_x)/self.map_mult)+MAP_COLS_HLEN+XOFFSET
             ry = MAP_COLS_HLEN-int(-(self.robot_y)/self.map_mult)+YOFFSET
             x2 = rx + int(25*np.cos(-self.robot_yaw+self.map_yaw+np.pi))
@@ -348,16 +363,11 @@ class FileSubscriber():
 
         # Draw goal
         if self.goal_msg is not None:
-            position = self.goal_msg[0:3]
-            quat = self.goal_msg[3:7]
             status = self.goal_msg[-1]
-            self.rgx = position[0]
-            self.rgy = position[1]
             if status < 3:
                 color = tuple((0,1,0))
             else:
                 color = tuple((0,0.35,0.65))
-            self.rga = euler_from_tuple(quat)[2]
             gx = int(-(self.rgx)/self.map_mult)+MAP_COLS_HLEN+XOFFSET
             gy = MAP_COLS_HLEN-int(-(self.rgy)/self.map_mult)+YOFFSET
             x2 = gx + int(25*np.cos(-self.rga+self.map_yaw+np.pi))
@@ -431,7 +441,7 @@ class FileSubscriber():
         yaw_inc = 2.6 # 2.5
         x_inc = 1.2
         y_inc = 3.
-        print('TAGS', tags)
+        # print('TAGS', tags)
         for tag_id, tag in tags.items():
             x = tag['t'][0]
             y = -tag['t'][1]
@@ -459,13 +469,30 @@ class FileSubscriber():
             new_obj['x'] = obj['t'][0]
             new_obj['y'] = obj['t'][1]
             new_obj['angle'] = obj['yaw']
-            if 0 < objid < 10:
-                new_obj['type'] = "chair"
-                new_obj['size'] = [0.35, 0.35]
-            elif 10 <= objid < 20:
+            if objid in [1, 2, 3]:
+                new_obj['type'] = "chair"       # small ones
+                new_obj['size'] = [0.43, 0.48]
+            elif objid in [4, 5]:
+                new_obj['type'] = "chair"       # bigger ones
+                new_obj['size'] = [0.66, 0.62]
+            elif objid in [6, 7, 8]:
                 new_obj['type'] = "table"
-                new_obj['size'] = [0.55, 0.55]
+                new_obj['size'] = [0.40, 0.48]
+            elif objid in [9, 10]:
+                new_obj['type'] = "table"
+                new_obj['size'] = [0.75, 0.42]
+            else:
+                print(f"objid {objid} not handled")
+                sys.exit(-1)
+            # Update pose dictionary for smoothing noise poses in objects
+            if new_obj["id"] not in self.detected_objects_mean_pose.keys():
+                self.detected_objects_mean_pose[new_obj["id"]] = {'x':[], 'y':[], 'angle': []}
+            self.detected_objects_mean_pose[new_obj["id"]]['x'].append(new_obj['x'])
+            self.detected_objects_mean_pose[new_obj["id"]]['y'].append(new_obj['y'])
+            self.detected_objects_mean_pose[new_obj["id"]]['angle'].append(new_obj['angle'])
+
             processed.append(new_obj)
+            
         self.detected_objects = processed
         self.objects = self.initial_objects + self.detected_objects
 
@@ -538,6 +565,20 @@ class FileSubscriber():
             self.humans.append({"id":h_id, "x":pose[0], "y":pose[1], "angle":pose[2]})
         # self.humans = [ get_human_pose(x) for x in self.skeletons ]
         self.update_humans_ids()
+
+    def postprocess_detected_objects(self):
+        mean_poses = {}
+        for id, poses in self.detected_objects_mean_pose.items():
+            mean_x = np.mean(poses['x'])
+            mean_y = np.mean(poses['y'])
+            mean_angle = np.mean(poses['angle'])
+            mean_poses[id] = {'x':mean_x, 'y':mean_y, 'angle':mean_angle}
+        for d in data_structure['sequence']:
+            for o in d["objects"]:
+                if o['id'] in mean_poses.keys():
+                    o['x'] = mean_poses[o['id']]['x']
+                    o['y'] = mean_poses[o['id']]['y']
+                    o['angle'] = mean_poses[o['id']]['angle']
 
 
 
@@ -613,6 +654,8 @@ if __name__ == "__main__":
         except EOFError:
             break
 
+        stuff.update_robot_and_goal_pose()
+        
         # Process drawing and video
         if last_draw is None:
             draw = True
@@ -622,17 +665,20 @@ if __name__ == "__main__":
             draw = False
         if draw:
             last_draw = msg["time"]
-            stuff.draw_things()
+            if NOX is False:
+                stuff.draw_things()
             stuff.add_to_json_structure()
 
+    stuff.postprocess_detected_objects()
     json_fd = open(sys.argv[1].replace(".pickle", ".json"), "w")
     # print(data_structure)
     # json.dump(data_structure, json_fd, indent=4)
     dump_custom(data_structure, json_fd, indent=4)
     wfd.close()
 
-    for i in range(FPS*3):
-        writer.write(concatenated)
-        # concatenated[concatenated>2] -= 2
+    if NOX is False:
+        for i in range(FPS*3):
+            writer.write(concatenated)
+            # concatenated[concatenated>2] -= 2
 
 
