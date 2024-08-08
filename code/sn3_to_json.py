@@ -273,9 +273,15 @@ class FileSubscriber():
             "walls": self.walls,
             "interactions": self.interactions # TO DO
         }
-        if self.robot_pose_updated:
-            self.frames_with_robot_pose.append(len(data_structure["sequence"]))
-            self.robot_pose_updated = False
+        n_data = len(data_structure["sequence"])
+        if n_data > 0:
+            last = data_structure["sequence"][n_data-1]["robot"]
+            curr = ret["robot"]
+            if last["x"]!=curr["x"] or last["y"]!=curr["y"] or last["angle"]!=curr["angle"]:
+                self.frames_with_robot_pose.append(n_data)    
+        # if self.robot_pose_updated:
+        #     self.frames_with_robot_pose.append(len(data_structure["sequence"]))
+        #     self.robot_pose_updated = False
         data_structure["sequence"].append(ret)
 
     def update_robot_and_goal_pose(self):
@@ -604,7 +610,12 @@ class FileSubscriber():
                     data_structure['sequence'][lf]["robot"]["y"] = last_y + (new_y - last_y)*(lf-last_frame)/(f-last_frame)
                     angle = last_angle + (new_angle - last_angle)*(lf-last_frame)/(f-last_frame)
                     data_structure['sequence'][lf]["robot"]["angle"] = np.arctan2(np.sin(angle), np.cos(angle))
+                    print("changing frame", lf)
+                    print(data_structure['sequence'][lf]["robot"])
                     lf += 1
+                print("frame", f)
+                print(data_structure['sequence'][f]["robot"])
+                print("------------------")
                 last_frame = f
                 last_x = new_x
                 last_y = new_y
