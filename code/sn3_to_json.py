@@ -244,6 +244,9 @@ class FileSubscriber():
 
         self.initial_objects = objects
 
+        self.frames_with_robot_pose = []
+        self.robot_pose_updated = False
+
         self.video = {}
 
 
@@ -270,6 +273,9 @@ class FileSubscriber():
             "walls": self.walls,
             "interactions": self.interactions # TO DO
         }
+        if self.robot_pose_updated:
+            self.frames_with_robot_pose.append(len(data_structure["sequence"]))
+            self.robot_pose_updated = False
         data_structure["sequence"].append(ret)
 
     def update_robot_and_goal_pose(self):
@@ -579,7 +585,30 @@ class FileSubscriber():
                     o['y'] = mean_poses[o['id']]['y']
                     o['angle'] = mean_poses[o['id']]['angle']
 
-
+    def postprocess_robot_poses(self):
+        if len(self.frames_with_robot_pose)>0:
+            f = self.frames_with_robot_pose[0]
+            last_x = data_structure['sequence'][f]["robot"]["x"]
+            last_y = data_structure['sequence'][f]["robot"]["y"]
+            last_angle = data_structure['sequence'][f]["robot"]["angle"]
+            last_frame = -1
+            for f in self.frames_with_robot_pose:
+                lf = last_frame + 1
+                new_x = data_structure['sequence'][f]["robot"]["x"]
+                new_y = data_structure['sequence'][f]["robot"]["y"]
+                new_angle = data_structure['sequence'][f]["robot"]["angle"]
+                while lf < f:
+                    if lf >= len(data_structure['sequence']):
+                        break
+                    data_structure['sequence'][lf]["robot"]["x"] = last_x + (new_x - last_x)*(lf-last_frame)/(f-last_frame)
+                    data_structure['sequence'][lf]["robot"]["y"] = last_y + (new_y - last_y)*(lf-last_frame)/(f-last_frame)
+                    angle = last_angle + (new_angle - last_angle)*(lf-last_frame)/(f-last_frame)
+                    data_structure['sequence'][lf]["robot"]["angle"] = np.arctan2(np.sin(angle), np.cos(angle))
+                    lf += 1
+                last_frame = f
+                last_x = new_x
+                last_y = new_y
+                last_angle = new_angle
 
 class CustomEncoder(json.JSONEncoder):
     def encode(self, obj):
@@ -636,6 +665,7 @@ if __name__ == "__main__":
             elif msg["type"] == "goal":
                 stuff.listener_goal(msg["data"])
             elif msg["type"] == "pose":
+                stuff.robot_pose_updated = True
                 stuff.listener_pose(msg["data"])
             elif msg["type"] == "laser":
                 stuff.listener_laser(msg["data"])
@@ -669,6 +699,7 @@ if __name__ == "__main__":
             stuff.add_to_json_structure()
 
     stuff.postprocess_detected_objects()
+    stuff.postprocess_robot_poses()
     json_fd = open(sys.argv[1].replace(".pickle", ".json"), "w")
     # print(data_structure)
     # json.dump(data_structure, json_fd, indent=4)
