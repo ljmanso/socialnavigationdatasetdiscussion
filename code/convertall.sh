@@ -1,4 +1,12 @@
-l=`ls *_pre.pickle`
+if test -z "$1"
+then
+    echo "You need to specify a directory."
+fi
+
+
+l=`ls $1/*_pre.pickle`
+# echo $l
+# exit
 
 for pre in $l; do
     dat=${pre/pre/dat}

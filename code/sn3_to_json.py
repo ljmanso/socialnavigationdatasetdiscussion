@@ -19,6 +19,7 @@ except:
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w,h), 0.5, (w,h))
 mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5)
 
+DESC = sys.argv[2]
 VID = "video" in sys.argv
 VID = False
 
@@ -441,7 +442,6 @@ class FileSubscriber():
         yaw_inc = 2.6 # 2.5
         x_inc = 1.2
         y_inc = 3.
-        # print('TAGS', tags)
         for tag_id, tag in tags.items():
             x = tag['t'][0]
             y = -tag['t'][1]
