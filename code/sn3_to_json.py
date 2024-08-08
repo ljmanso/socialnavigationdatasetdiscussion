@@ -19,7 +19,6 @@ except:
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w,h), 0.5, (w,h))
 mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5)
 
-DESC = sys.argv[2]
 VID = "video" in sys.argv
 VID = False
 
