@@ -198,6 +198,8 @@ def get_human_pose(skeleton):
         else:
             angle_final = angle_final/2 + angle/2
     angle += np.pi/2.
+    while angle < 0:
+        angle = 2*np.pi + angle
     hx = x / 4
     hy = y / 4
     return hx, hy, angle
@@ -554,10 +556,11 @@ class FileSubscriber():
             if dist < min_dist:
                 min_dist = dist
                 h_id = id
+
         if h_id < 0 or min_dist>max_human_distance:
             h_id = self.next_id
             self.next_id += 1
-        return h_id            
+        return h_id
             
     def update_humans_ids(self, max_time_without_update = 3):
         for h in self.humans:
@@ -574,12 +577,29 @@ class FileSubscriber():
 
     def listener_skeletons(self, data):
         self.skeletons = data
-        self.humans = []
+
+        temp_humans = []
+        humans_assigned_to_id = {}
         for id, s in enumerate(self.skeletons):
             pose = get_human_pose(s)
-            h_id = self.get_id_for_human(pose)
-            self.humans.append({"id":h_id, "x":pose[0], "y":pose[1], "angle":pose[2]})
-        # self.humans = [ get_human_pose(x) for x in self.skeletons ]
+            h_id = self.get_id_for_human([pose[0], pose[1]])
+            temp_humans.append({"id":h_id, "x":pose[0], "y":pose[1], "angle":pose[2]})
+            if not h_id in humans_assigned_to_id.keys():
+                humans_assigned_to_id[h_id] = []
+            humans_assigned_to_id[h_id].append(temp_humans[-1])
+
+        self.humans = []
+        for h_id in humans_assigned_to_id:
+            final_human = {"id":h_id, "x":0, "y":0, "angle":0}
+            for h in humans_assigned_to_id[h_id]:
+                final_human["x"] += h["x"]
+                final_human["y"] += h["y"]
+                final_human["angle"] += h["angle"]
+            final_human["x"] /= len(humans_assigned_to_id[h_id])
+            final_human["y"] /= len(humans_assigned_to_id[h_id])
+            final_human["angle"] /= len(humans_assigned_to_id[h_id])
+            self.humans.append(final_human)
+
         self.update_humans_ids()
 
     def postprocess_detected_objects(self):
@@ -615,12 +635,12 @@ class FileSubscriber():
                     data_structure['sequence'][lf]["robot"]["y"] = last_y + (new_y - last_y)*(lf-last_frame)/(f-last_frame)
                     angle = last_angle + (new_angle - last_angle)*(lf-last_frame)/(f-last_frame)
                     data_structure['sequence'][lf]["robot"]["angle"] = np.arctan2(np.sin(angle), np.cos(angle))
-                    #print("changing frame", lf)
-                    #print(data_structure['sequence'][lf]["robot"])
+                    # print("changing frame", lf)
+                    # print(data_structure['sequence'][lf]["robot"])
                     lf += 1
-                #print("frame", f)
-                #print(data_structure['sequence'][f]["robot"])
-                #print("------------------")
+                # print("frame", f)
+                # print(data_structure['sequence'][f]["robot"])
+                # print("------------------")
                 last_frame = f
                 last_x = new_x
                 last_y = new_y
