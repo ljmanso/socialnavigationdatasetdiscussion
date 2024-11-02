@@ -444,8 +444,10 @@ class FileSubscriber():
 
 
     def listener_goal(self, msg):
-        self.goal_msg = [float(x) for x in msg.split(",")]
-
+        try:
+            self.goal_msg = [float(x) for x in msg.split(",")]
+        except:
+            print(msg)
 
     def move_objects_rf(self, tags):
         ret = {}
@@ -494,7 +496,7 @@ class FileSubscriber():
                 new_obj['size'] = [0.75, 0.42]
             else:
                 print(f"objid {objid} not handled")
-                sys.exit(-1)
+                continue
             # Update pose dictionary for smoothing noise poses in objects
             if new_obj["id"] not in self.detected_objects_mean_pose.keys():
                 self.detected_objects_mean_pose[new_obj["id"]] = {'x':[], 'y':[], 'angle': []}
@@ -537,6 +539,9 @@ class FileSubscriber():
 
         self.map_msg = msg
         data_structure["grid"] = json_struct_from_map(self, msg)
+        #print(data_structure["grid"].keys())
+        data_structure["grid"]["data"].reverse()
+        data_structure["grid"]["width"], data_structure["grid"]["height"] = data_structure["grid"]["height"], data_structure["grid"]["width"]
 
     def get_id_for_human(self, pose, max_human_distance=1.0):
         h_id = -1
@@ -610,12 +615,12 @@ class FileSubscriber():
                     data_structure['sequence'][lf]["robot"]["y"] = last_y + (new_y - last_y)*(lf-last_frame)/(f-last_frame)
                     angle = last_angle + (new_angle - last_angle)*(lf-last_frame)/(f-last_frame)
                     data_structure['sequence'][lf]["robot"]["angle"] = np.arctan2(np.sin(angle), np.cos(angle))
-                    print("changing frame", lf)
-                    print(data_structure['sequence'][lf]["robot"])
+                    #print("changing frame", lf)
+                    #print(data_structure['sequence'][lf]["robot"])
                     lf += 1
-                print("frame", f)
-                print(data_structure['sequence'][f]["robot"])
-                print("------------------")
+                #print("frame", f)
+                #print(data_structure['sequence'][f]["robot"])
+                #print("------------------")
                 last_frame = f
                 last_x = new_x
                 last_y = new_y

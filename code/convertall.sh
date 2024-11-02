@@ -13,9 +13,9 @@ for pre in $l; do
     nop=${pre/pre.pickle/}
     trj=${pre/pre/trj}
     echo "Joining $pre and $dat"
-    #python3 join.py $nop #2> /dev/null
+    python3 join.py $nop #2> /dev/null
     echo "Generating JSON for $trj."
-    python3 sn3_to_json.py $trj $mode $video #2> /dev/null
+    python3 sn3_to_json.py $trj #2> /dev/null
 
     #for mode in "joints" ; do # "polygons" "circles" "joints"
     #    for video in "novideo"; do
