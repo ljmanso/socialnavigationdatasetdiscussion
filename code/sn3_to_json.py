@@ -198,6 +198,8 @@ def get_human_pose(skeleton):
         else:
             angle_final = angle_final/2 + angle/2
     angle += np.pi/2.
+    if angle < 0:
+        angle = 2*np.pi + angle
     hx = x / 4
     hy = y / 4
     return hx, hy, angle
@@ -538,50 +540,28 @@ class FileSubscriber():
         self.map_msg = msg
         data_structure["grid"] = json_struct_from_map(self, msg)
 
-    def double_check_assignment(self, sk_id, h_id, others):
-        doublecheck_h_id = -1
-        doublecheck_min_dist = np.inf
-        lpose = self.humans_ids[h_id]["pos"]
-        pc = np.array([lpose[0], lpose[1]])
-        for p_id, p in enumerate(others):
-            if p["id"]==h_id:
-                return False
-            if p["id"]== -1:
-                pp = np.array([p["x"], p["y"]])
-                dist = np.linalg.norm(pp-pc)
-                if dist < doublecheck_min_dist:
-                    doublecheck_min_dist = dist
-                    doublecheck_h_id = p_id
-        if doublecheck_h_id != sk_id:
-            return False
-        return True
-
-    def get_id_for_human(self, sk_id, pose, others, max_human_distance=1.0):
+    def get_id_for_human(self, pose, max_human_distance=1.0):
         h_id = -1
         min_dist = np.inf
         pc = np.array([pose[0], pose[1]])
         for id, id_info in self.humans_ids.items():
-            if not id_info["assigned"]:
-                lpose = id_info["pos"]
-                pp = np.array([lpose[0], lpose[1]])
-                dist = np.linalg.norm(pp-pc)
-                if dist < min_dist and self.double_check_assignment(sk_id, id, others):
-                    min_dist = dist
-                    h_id = id
+            lpose = id_info["pos"]
+            pp = np.array([lpose[0], lpose[1]])
+            dist = np.linalg.norm(pp-pc)
+            if dist < min_dist: 
+                min_dist = dist
+                h_id = id
 
         if h_id < 0 or min_dist>max_human_distance:
             h_id = self.next_id
             self.next_id += 1
-            self.humans_ids[h_id] = {"pos": pose, "timestamp": self.timestamp, "assigned": True}
-
-        self.humans_ids[h_id]["assigned"] = True        
         return h_id
             
     def update_humans_ids(self, max_time_without_update = 3):
         for h in self.humans:
             id = h["id"]
             p = [h["x"], h["y"], h["angle"]]
-            self.humans_ids[id] = {"pos": p, "timestamp": self.timestamp, "assigned": True}
+            self.humans_ids[id] = {"pos": p, "timestamp": self.timestamp}
 
         ids = self.humans_ids.keys()
         for i in list(ids):
@@ -592,25 +572,28 @@ class FileSubscriber():
 
     def listener_skeletons(self, data):
         self.skeletons = data
-        self.humans = []
-        for id in self.humans_ids:
-            self.humans_ids[id]["assigned"] = False
+
         temp_humans = []
+        humans_assigned_to_id = {}
         for id, s in enumerate(self.skeletons):
             pose = get_human_pose(s)
-            temp_humans.append({"id":-1, "x":pose[0], "y":pose[1], "angle":pose[2]})
-        for h1 in temp_humans:
-            p1 = np.array([h1['x'], h1['y']])
-            is_new_person = True
-            for h2 in self.humans:
-                p2 = np.array([h2['x'], h2['y']])
-                if np.linalg.norm(p1-p2)<0.2:
-                    is_new_person = False
-            if is_new_person:
-                self.humans.append(h1)
-        for h in range(len(self.humans)):
-            h_id = self.get_id_for_human(h, [self.humans[h]["x"], self.humans[h]["y"]], self.humans)
-            self.humans[h]["id"] = h_id
+            h_id = self.get_id_for_human([pose[0], pose[1]])
+            temp_humans.append({"id":h_id, "x":pose[0], "y":pose[1], "angle":pose[2]})
+            if not h_id in humans_assigned_to_id.keys():
+                humans_assigned_to_id[h_id] = []
+            humans_assigned_to_id[h_id].append(temp_humans[-1])
+
+        self.humans = []
+        for h_id in humans_assigned_to_id:
+            final_human = {"id":h_id, "x":0, "y":0, "angle":0}
+            for h in humans_assigned_to_id[h_id]:
+                final_human["x"] += h["x"]
+                final_human["y"] += h["y"]
+                final_human["angle"] += h["angle"]
+            final_human["x"] /= len(humans_assigned_to_id[h_id])
+            final_human["y"] /= len(humans_assigned_to_id[h_id])
+            final_human["angle"] /= len(humans_assigned_to_id[h_id])
+            self.humans.append(final_human)
 
         self.update_humans_ids()
 
@@ -647,12 +630,12 @@ class FileSubscriber():
                     data_structure['sequence'][lf]["robot"]["y"] = last_y + (new_y - last_y)*(lf-last_frame)/(f-last_frame)
                     angle = last_angle + (new_angle - last_angle)*(lf-last_frame)/(f-last_frame)
                     data_structure['sequence'][lf]["robot"]["angle"] = np.arctan2(np.sin(angle), np.cos(angle))
-                    print("changing frame", lf)
-                    print(data_structure['sequence'][lf]["robot"])
+                    # print("changing frame", lf)
+                    # print(data_structure['sequence'][lf]["robot"])
                     lf += 1
-                print("frame", f)
-                print(data_structure['sequence'][f]["robot"])
-                print("------------------")
+                # print("frame", f)
+                # print(data_structure['sequence'][f]["robot"])
+                # print("------------------")
                 last_frame = f
                 last_x = new_x
                 last_y = new_y
